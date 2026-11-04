@@ -1,0 +1,342 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny catch-all (Global Safety Net)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connectivity verification probe
+    match /test/connection {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSystemAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'marinho.gianluca@gmail.com' ||
+        (exists(/databases/$(database)/documents/system_users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/system_users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // 1. System Users (Team members, login credentials, and permissions)
+    match /system_users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(userId) &&
+        incoming().keys().hasAll(['id', 'name', 'email', 'role', 'active']) &&
+        incoming().name is string && incoming().name.size() <= 128 &&
+        incoming().email is string && incoming().email.size() <= 128 &&
+        incoming().role in ['admin', 'gerente', 'treinador', 'recepcao', 'financeiro', 'aluno'] &&
+        incoming().active is bool;
+      allow update: if isSignedIn() && isValidId(userId) && (
+        isSystemAdmin() ||
+        (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['lastLogin', 'password', 'phone', 'avatar'])) ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['lastLogin'])
+      );
+      allow delete: if isSystemAdmin() && isValidId(userId);
+    }
+
+    // 2. Students
+    match /students/{studentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(studentId) &&
+        incoming().keys().hasAll(['id', 'name', 'status']) &&
+        incoming().name is string && incoming().name.size() <= 128 &&
+        incoming().status in ['ativo', 'inativo', 'pendente', 'bloqueado'];
+      allow update: if isSignedIn() && isValidId(studentId) &&
+        incoming().name is string && incoming().name.size() <= 128;
+      allow delete: if isSystemAdmin() && isValidId(studentId);
+    }
+
+    // 3. Plans
+    match /plans/{planId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(planId) &&
+        incoming().keys().hasAll(['id', 'name', 'price', 'active']) &&
+        incoming().name is string && incoming().name.size() <= 128 &&
+        incoming().price is number && incoming().price >= 0;
+      allow delete: if isSystemAdmin() && isValidId(planId);
+    }
+
+    // 4. Financial Transactions
+    match /financial_transactions/{transactionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(transactionId) &&
+        incoming().keys().hasAll(['id', 'type', 'description', 'amount', 'status']) &&
+        incoming().type in ['receita', 'despesa'] &&
+        incoming().description is string && incoming().description.size() <= 256 &&
+        incoming().amount is number && incoming().amount >= 0 &&
+        incoming().status in ['pago', 'pendente', 'atrasado', 'cancelado'];
+      allow update: if isSignedIn() && isValidId(transactionId) &&
+        incoming().amount is number && incoming().amount >= 0;
+      allow delete: if isSystemAdmin() && isValidId(transactionId);
+    }
+
+    // 5. Classes (Grade Horária)
+    match /classes/{classId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(classId) &&
+        incoming().keys().hasAll(['id', 'name', 'instructor', 'capacity']) &&
+        incoming().name is string && incoming().name.size() <= 128 &&
+        incoming().capacity is number && incoming().capacity > 0;
+      allow delete: if isSignedIn() && isValidId(classId);
+    }
+
+    // 6. Workouts (Fichas de Treino)
+    match /workouts/{workoutId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(workoutId) &&
+        incoming().keys().hasAll(['id', 'studentId', 'title']) &&
+        incoming().title is string && incoming().title.size() <= 128;
+      allow delete: if isSignedIn() && isValidId(workoutId);
+    }
+
+    // 7. Products (Estoque & PDV)
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(productId) &&
+        incoming().keys().hasAll(['id', 'name', 'price', 'stock']) &&
+        incoming().name is string && incoming().name.size() <= 128 &&
+        incoming().price is number && incoming().price >= 0 &&
+        incoming().stock is number;
+      allow delete: if isSystemAdmin() && isValidId(productId);
+    }
+
+    // 8. Comandas
+    match /comandas/{comandaId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(comandaId) &&
+        incoming().keys().hasAll(['id', 'number', 'studentName', 'status', 'total']) &&
+        incoming().status in ['aberta', 'fechada', 'cancelada'] &&
+        incoming().total is number;
+      allow delete: if isSystemAdmin() && isValidId(comandaId);
+    }
+
+    // 9. Stock Movements
+    match /stock_movements/{movementId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(movementId) &&
+        incoming().keys().hasAll(['id', 'productId', 'type', 'quantity', 'date']) &&
+        incoming().type in ['entrada', 'saida', 'ajuste'] &&
+        incoming().quantity is number && incoming().quantity > 0;
+      allow update, delete: if isSystemAdmin() && isValidId(movementId);
+    }
+
+    // 10. Suppliers
+    match /suppliers/{supplierId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(supplierId) &&
+        incoming().keys().hasAll(['id', 'name']) &&
+        incoming().name is string && incoming().name.size() <= 128;
+      allow delete: if isSystemAdmin() && isValidId(supplierId);
+    }
+
+    // 11. Recurring Charges
+    match /recurring_charges/{chargeId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(chargeId) &&
+        incoming().keys().hasAll(['id', 'studentName', 'amount', 'status']) &&
+        incoming().amount is number && incoming().amount >= 0 &&
+        incoming().status in ['ativa', 'falhou', 'cancelada', 'processando'];
+      allow delete: if isSystemAdmin() && isValidId(chargeId);
+    }
+
+    // 12. Payment Links
+    match /payment_links/{linkId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(linkId) &&
+        incoming().keys().hasAll(['id', 'title', 'amount', 'status', 'url']) &&
+        incoming().amount is number && incoming().amount >= 0 &&
+        incoming().status in ['ativo', 'pago', 'expirado'];
+      allow delete: if isSystemAdmin() && isValidId(linkId);
+    }
+
+    // 13. CRM Activities
+    match /crm_activities/{activityId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(activityId) &&
+        incoming().keys().hasAll(['id', 'title', 'type', 'date', 'status']) &&
+        incoming().status in ['pendente', 'concluido', 'cancelado'];
+      allow delete: if isSignedIn() && isValidId(activityId);
+    }
+
+    // 14. Calendar Events
+    match /calendar_events/{eventId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(eventId) &&
+        incoming().keys().hasAll(['id', 'title', 'start', 'end']) &&
+        incoming().title is string && incoming().title.size() <= 128;
+      allow delete: if isSignedIn() && isValidId(eventId);
+    }
+
+    // 15. Access Logs (Catraca)
+    match /access_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId) &&
+        incoming().keys().hasAll(['id', 'studentName', 'timestamp', 'status']) &&
+        incoming().status in ['liberado', 'bloqueado', 'alerta'];
+      allow update, delete: if isSystemAdmin() && isValidId(logId);
+    }
+
+    // 16. Team Tasks (Tarefas Colaborativas da Equipe)
+    match /team_tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(taskId) &&
+        incoming().keys().hasAll(['id', 'title', 'status', 'priority']) &&
+        incoming().status in ['pendente', 'em_andamento', 'concluida', 'cancelada'] &&
+        incoming().priority in ['baixa', 'media', 'alta', 'urgente'];
+      allow delete: if isSignedIn() && isValidId(taskId);
+    }
+
+    // 17. Folha de Ponto
+    match /folha_ponto/{recordId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(recordId) &&
+        incoming().keys().hasAll(['id', 'teacherId', 'date']);
+      allow delete: if isSystemAdmin() && isValidId(recordId);
+    }
+
+    // 18. Notifications
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(notificationId) &&
+        incoming().keys().hasAll(['id', 'title', 'message', 'read', 'timestamp']) &&
+        incoming().read is bool;
+      allow delete: if isSignedIn() && isValidId(notificationId);
+    }
+
+    // 19. System Settings
+    match /system_settings/{settingId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(settingId) &&
+        incoming().keys().hasAll(['id', 'gymName']);
+      allow delete: if false;
+    }
+
+    // 20. Leads & CRM Funnel
+    match /leads/{leadId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(leadId) &&
+        incoming().keys().hasAll(['id', 'name', 'stage']) &&
+        incoming().name is string && incoming().name.size() <= 128;
+      allow delete: if isSignedIn() && isValidId(leadId);
+    }
+
+    // 21. CRM Automations
+    match /crm_automations/{automationId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(automationId) &&
+        incoming().keys().hasAll(['id', 'title', 'trigger', 'action', 'active']);
+      allow delete: if isSystemAdmin() && isValidId(automationId);
+    }
+
+    // 22. Satisfaction Surveys & NPS
+    match /satisfaction_surveys/{surveyId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(surveyId) &&
+        incoming().keys().hasAll(['id', 'studentName', 'rating', 'date']);
+      allow delete: if isSystemAdmin() && isValidId(surveyId);
+    }
+
+    // 23. Tab Configurations & Parameters
+    match /tab_settings/{tabId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(tabId) &&
+        incoming().keys().hasAll(['id', 'tab', 'title', 'groups']);
+      allow delete: if isSystemAdmin() && isValidId(tabId);
+    }
+
+    // 24. Folha de Ponto - Professores
+    match /folha_teachers/{teacherId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(teacherId) &&
+        incoming().keys().hasAll(['id', 'name', 'role', 'hourlyRate']);
+      allow delete: if isSystemAdmin() && isValidId(teacherId);
+    }
+
+    // 25. Folha de Ponto - Turmas
+    match /folha_turmas/{turmaId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(turmaId) &&
+        incoming().keys().hasAll(['id', 'name', 'teacherId', 'active']);
+      allow delete: if isSystemAdmin() && isValidId(turmaId);
+    }
+
+    // 26. Folha de Ponto - Registros / Diário de Aulas
+    match /folha_records/{recordId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(recordId) &&
+        incoming().keys().hasAll(['id', 'teacherId', 'date']);
+      allow delete: if isSystemAdmin() && isValidId(recordId);
+    }
+
+    // 27. WhatsApp Multi-Atendimento - Conversas
+    match /whatsapp_chats/{chatId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(chatId) &&
+        incoming().keys().hasAll(['id', 'name', 'phone']);
+      allow delete: if isSystemAdmin() && isValidId(chatId);
+    }
+
+    // 28. WhatsApp Multi-Atendimento - Mensagens
+    match /whatsapp_messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(messageId) &&
+        incoming().keys().hasAll(['id', 'chatId', 'text', 'sender']);
+      allow delete: if isSystemAdmin() && isValidId(messageId);
+    }
+
+    // 29. Catálogo de Exercícios
+    match /exercises_catalog/{exerciseId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(exerciseId) &&
+        incoming().keys().hasAll(['id', 'name', 'muscleGroup']);
+      allow delete: if isSystemAdmin() && isValidId(exerciseId);
+    }
+
+    // 30. Histórico de Progressão de Carga
+    match /exercise_load_history/{logId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(logId) &&
+        incoming().keys().hasAll(['id', 'studentId', 'exerciseId', 'weightKg', 'date']);
+      allow delete: if isSignedIn() && isValidId(logId);
+    }
+
+    // 31. Trilha de Auditoria & Segurança LGPD
+    match /security_audit_logs/{logId} {
+      allow read: if isSystemAdmin();
+      allow create: if isSignedIn() && isValidId(logId) &&
+        incoming().keys().hasAll(['id', 'timestamp', 'eventType', 'userEmail', 'status']);
+      allow update, delete: if false;
+    }
+
+    // 32. Lesson Plans (Planos de Aula & Treino Estruturado)
+    match /lesson_plans/{planId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(planId) &&
+        incoming().keys().hasAll(['id', 'title', 'date', 'level']) &&
+        incoming().title is string && incoming().title.size() <= 128 &&
+        incoming().level in ['Iniciante', 'Intermediário', 'Avançado'];
+      allow delete: if isSignedIn() && isValidId(planId);
+    }
+  }
+}

@@ -1,0 +1,601 @@
+{
+  "entities": {
+    "SystemUser": {
+      "title": "SystemUser",
+      "description": "Usuário do sistema administrativo e membros da equipe com credenciais, papel e permissões",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["admin", "gerente", "treinador", "recepcao", "financeiro", "aluno"] },
+        "phone": { "type": "string", "maxLength": 32 },
+        "department": { "type": "string", "maxLength": 64 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "lastLogin": { "type": "string", "maxLength": 64 },
+        "password": { "type": "string", "maxLength": 128 },
+        "permissions": { "type": "array" }
+      },
+      "required": ["id", "name", "email", "role", "active"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Aluno matriculado na academia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "status": { "type": "string", "enum": ["ativo", "inativo", "pendente", "bloqueado"] },
+        "plan": { "type": "string", "maxLength": 128 },
+        "joinDate": { "type": "string", "maxLength": 64 },
+        "birthDate": { "type": "string", "maxLength": 64 },
+        "cpf": { "type": "string", "maxLength": 32 },
+        "emergencyContact": { "type": "string", "maxLength": 128 },
+        "photo": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "name", "status"]
+    },
+    "Plan": {
+      "title": "Plan",
+      "description": "Plano ou assinatura oferecido pela academia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "price": { "type": "number" },
+        "durationMonths": { "type": "number" },
+        "description": { "type": "string", "maxLength": 256 },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "name", "price", "active"]
+    },
+    "FinancialTransaction": {
+      "title": "FinancialTransaction",
+      "description": "Lançamento financeiro de receita ou despesa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["receita", "despesa"] },
+        "category": { "type": "string", "maxLength": 128 },
+        "description": { "type": "string", "maxLength": 256 },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "maxLength": 64 },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["pago", "pendente", "atrasado", "cancelado"] },
+        "paymentMethod": { "type": "string", "maxLength": 64 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "type", "description", "amount", "status"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "Turma ou aula coletiva da academia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "instructor": { "type": "string", "maxLength": 128 },
+        "time": { "type": "string", "maxLength": 32 },
+        "duration": { "type": "number" },
+        "capacity": { "type": "number" },
+        "enrolled": { "type": "number" },
+        "days": { "type": "array" }
+      },
+      "required": ["id", "name", "instructor", "capacity"]
+    },
+    "Workout": {
+      "title": "Workout",
+      "description": "Ficha de treino prescrita para o aluno",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "objective": { "type": "string", "maxLength": 128 },
+        "startDate": { "type": "string", "maxLength": 64 },
+        "endDate": { "type": "string", "maxLength": 64 },
+        "exercises": { "type": "array" }
+      },
+      "required": ["id", "studentId", "title"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Produto para venda na cantina ou loja da academia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "category": { "type": "string", "maxLength": 64 },
+        "price": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "barcode": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name", "price", "stock"]
+    },
+    "Comanda": {
+      "title": "Comanda",
+      "description": "Comanda de consumo em aberto ou fechada",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "number": { "type": "number" },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["aberta", "fechada", "cancelada"] },
+        "openedAt": { "type": "string", "maxLength": 64 },
+        "closedAt": { "type": "string", "maxLength": 64 },
+        "total": { "type": "number" },
+        "items": { "type": "array" }
+      },
+      "required": ["id", "number", "studentName", "status", "total"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Registro de entrada ou saída de estoque",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "productId": { "type": "string", "maxLength": 128 },
+        "productName": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["entrada", "saida", "ajuste"] },
+        "quantity": { "type": "number" },
+        "date": { "type": "string", "maxLength": 64 },
+        "reason": { "type": "string", "maxLength": 256 },
+        "user": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "productId", "type", "quantity", "date"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Fornecedor cadastrado",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "contact": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "email": { "type": "string", "maxLength": 128 },
+        "category": { "type": "string", "maxLength": 64 },
+        "cnpj": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["id", "name"]
+    },
+    "RecurringCharge": {
+      "title": "RecurringCharge",
+      "description": "Cobrança recorrente no cartão ou débito do aluno",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "planName": { "type": "string", "maxLength": 128 },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["ativa", "falhou", "cancelada", "processando"] },
+        "cardLast4": { "type": "string", "maxLength": 8 },
+        "nextBillingDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "studentName", "amount", "status"]
+    },
+    "PaymentLink": {
+      "title": "PaymentLink",
+      "description": "Link de pagamento gerado pelo GL Profit Pay",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["ativo", "pago", "expirado"] },
+        "url": { "type": "string", "maxLength": 512 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "amount", "status", "url"]
+    },
+    "CrmActivity": {
+      "title": "CrmActivity",
+      "description": "Atividade de CRM ou histórico de contato com aluno ou lead",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "maxLength": 64 },
+        "date": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["pendente", "concluido", "cancelado"] },
+        "notes": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "title", "type", "date", "status"]
+    },
+    "CalendarEvent": {
+      "title": "CalendarEvent",
+      "description": "Evento ou agendamento na agenda da academia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "start": { "type": "string", "maxLength": 64 },
+        "end": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "maxLength": 64 },
+        "instructor": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "title", "start", "end"]
+    },
+    "AccessLog": {
+      "title": "AccessLog",
+      "description": "Registro de acesso na catraca física ou virtual",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["liberado", "bloqueado", "alerta"] },
+        "type": { "type": "string", "maxLength": 64 },
+        "reason": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["id", "studentName", "timestamp", "status"]
+    },
+    "TeamTask": {
+      "title": "TeamTask",
+      "description": "Tarefa colaborativa compartilhada entre membros da equipe",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "description": { "type": "string", "maxLength": 512 },
+        "assignedTo": { "type": "string", "maxLength": 128 },
+        "assignedToEmail": { "type": "string", "maxLength": 128 },
+        "priority": { "type": "string", "enum": ["baixa", "media", "alta", "urgente"] },
+        "status": { "type": "string", "enum": ["pendente", "em_andamento", "concluida", "cancelada"] },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "status", "priority"]
+    },
+    "FolhaPontoRecord": {
+      "title": "FolhaPontoRecord",
+      "description": "Registro de ponto de professores e colaboradores",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "teacherId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 64 },
+        "turmaId": { "type": "string", "maxLength": 128 },
+        "checkIn": { "type": "string", "maxLength": 32 },
+        "checkOut": { "type": "string", "maxLength": 32 },
+        "status": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["id", "teacherId", "date"]
+    },
+    "NotificationItem": {
+      "title": "NotificationItem",
+      "description": "Notificação do sistema e alertas em tempo real",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "message": { "type": "string", "maxLength": 512 },
+        "read": { "type": "boolean" },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "message", "read", "timestamp"]
+    },
+    "SystemSetting": {
+      "title": "SystemSetting",
+      "description": "Configurações gerais e parâmetros da academia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "gymName": { "type": "string", "maxLength": 128 },
+        "cnpj": { "type": "string", "maxLength": 32 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "email": { "type": "string", "maxLength": 128 },
+        "address": { "type": "string", "maxLength": 256 },
+        "pixKey": { "type": "string", "maxLength": 128 },
+        "welcomeMessage": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "gymName"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Lead ou oportunidade comercial no funil de vendas do CRM",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "email": { "type": "string", "maxLength": 128 },
+        "stage": { "type": "string", "maxLength": 64 },
+        "value": { "type": "number" },
+        "source": { "type": "string", "maxLength": 64 },
+        "notes": { "type": "string", "maxLength": 512 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name", "stage"]
+    },
+    "CrmAutomation": {
+      "title": "CrmAutomation",
+      "description": "Gatilho e automação de régua de relacionamento no CRM",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "trigger": { "type": "string", "maxLength": 128 },
+        "action": { "type": "string", "maxLength": 128 },
+        "active": { "type": "boolean" },
+        "description": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["id", "title", "trigger", "action", "active"]
+    },
+    "SatisfactionSurvey": {
+      "title": "SatisfactionSurvey",
+      "description": "Resposta de pesquisa de satisfação e NPS de alunos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "rating": { "type": "number" },
+        "npsScore": { "type": "number" },
+        "comment": { "type": "string", "maxLength": 512 },
+        "date": { "type": "string", "maxLength": 64 },
+        "category": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "studentName", "rating", "date"]
+    },
+    "TabSetting": {
+      "title": "TabSetting",
+      "description": "Parâmetros e customizações de abas e módulos do sistema",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "tab": { "type": "string", "maxLength": 64 },
+        "subTab": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 128 },
+        "description": { "type": "string", "maxLength": 256 },
+        "groups": { "type": "array" }
+      },
+      "required": ["id", "tab", "title", "groups"]
+    },
+    "FolhaPontoTeacher": {
+      "title": "FolhaPontoTeacher",
+      "description": "Perfil de professor ou coordenador na folha de ponto",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "maxLength": 64 },
+        "hourlyRate": { "type": "number" },
+        "phone": { "type": "string", "maxLength": 32 },
+        "department": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name", "role", "hourlyRate"]
+    },
+    "FolhaPontoTurma": {
+      "title": "FolhaPontoTurma",
+      "description": "Turma regular vinculada a um professor na folha de ponto",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "teacherId": { "type": "string", "maxLength": 128 },
+        "active": { "type": "boolean" },
+        "daysOfWeek": { "type": "array" },
+        "startTime": { "type": "string", "maxLength": 16 },
+        "endTime": { "type": "string", "maxLength": 16 },
+        "durationHours": { "type": "number" }
+      },
+      "required": ["id", "name", "teacherId", "active"]
+    },
+    "WhatsappChat": {
+      "title": "WhatsappChat",
+      "description": "Conversa do multi-atendimento integrado do WhatsApp",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "lastMessage": { "type": "string", "maxLength": 256 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "unread": { "type": "number" },
+        "avatar": { "type": "string", "maxLength": 512 },
+        "tags": { "type": "array" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "WhatsappMessage": {
+      "title": "WhatsappMessage",
+      "description": "Mensagem enviada ou recebida via WhatsApp",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "chatId": { "type": "string", "maxLength": 128 },
+        "text": { "type": "string", "maxLength": 1024 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "sender": { "type": "string", "enum": ["user", "contact", "system"] },
+        "status": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["id", "chatId", "text", "sender"]
+    },
+    "ExerciseCatalogItem": {
+      "title": "ExerciseCatalogItem",
+      "description": "Item do catálogo oficial de exercícios de musculação e treino",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "muscleGroup": { "type": "string", "maxLength": 64 },
+        "category": { "type": "string", "maxLength": 64 },
+        "equipment": { "type": "string", "maxLength": 64 },
+        "executionTips": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "name", "muscleGroup"]
+    },
+    "ExerciseLoadLog": {
+      "title": "ExerciseLoadLog",
+      "description": "Histórico de progressão de carga e 1RM do aluno",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "exerciseId": { "type": "string", "maxLength": 128 },
+        "exerciseName": { "type": "string", "maxLength": 128 },
+        "weightKg": { "type": "number" },
+        "reps": { "type": "number" },
+        "date": { "type": "string", "maxLength": 64 },
+        "rpe": { "type": "number" }
+      },
+      "required": ["id", "studentId", "exerciseId", "weightKg", "date"]
+    },
+    "SecurityAuditLog": {
+      "title": "SecurityAuditLog",
+      "description": "Log de auditoria e segurança de acessos, logins e LGPD",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "eventType": { "type": "string", "maxLength": 64 },
+        "userEmail": { "type": "string", "maxLength": 128 },
+        "userName": { "type": "string", "maxLength": 128 },
+        "provider": { "type": "string", "maxLength": 32 },
+        "details": { "type": "string", "maxLength": 512 },
+        "status": { "type": "string", "enum": ["success", "warning", "danger"] }
+      },
+      "required": ["id", "timestamp", "eventType", "userEmail", "status"]
+    }
+  },
+  "firestore": {
+    "/system_users/{userId}": {
+      "schema": "SystemUser",
+      "description": "Usuários e membros da equipe com credenciais de login, senhas e permissões"
+    },
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Cadastro e prontuário de alunos da academia"
+    },
+    "/plans/{planId}": {
+      "schema": "Plan",
+      "description": "Planos e mensalidades"
+    },
+    "/financial_transactions/{transactionId}": {
+      "schema": "FinancialTransaction",
+      "description": "Transações financeiras (receitas, despesas, contas a pagar e receber)"
+    },
+    "/classes/{classId}": {
+      "schema": "Class",
+      "description": "Aulas e turmas na grade horária"
+    },
+    "/workouts/{workoutId}": {
+      "schema": "Workout",
+      "description": "Fichas de treinos e rotinas de exercícios"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Produtos do estoque e PDV"
+    },
+    "/comandas/{comandaId}": {
+      "schema": "Comanda",
+      "description": "Comandas de consumo"
+    },
+    "/stock_movements/{movementId}": {
+      "schema": "StockMovement",
+      "description": "Movimentações de entrada e saída do estoque"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Cadastro de fornecedores"
+    },
+    "/recurring_charges/{chargeId}": {
+      "schema": "RecurringCharge",
+      "description": "Cobranças recorrentes no cartão"
+    },
+    "/payment_links/{linkId}": {
+      "schema": "PaymentLink",
+      "description": "Links de pagamento gerados no GL Profit Pay"
+    },
+    "/crm_activities/{activityId}": {
+      "schema": "CrmActivity",
+      "description": "Atividades e interações do CRM"
+    },
+    "/calendar_events/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "Eventos e compromissos do calendário"
+    },
+    "/access_logs/{logId}": {
+      "schema": "AccessLog",
+      "description": "Logs de liberação e bloqueio na catraca"
+    },
+    "/team_tasks/{taskId}": {
+      "schema": "TeamTask",
+      "description": "Tarefas compartilhadas entre membros da equipe"
+    },
+    "/folha_ponto/{recordId}": {
+      "schema": "FolhaPontoRecord",
+      "description": "Registros de folha de ponto e turmas"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "NotificationItem",
+      "description": "Notificações do sistema para a equipe"
+    },
+    "/system_settings/{settingId}": {
+      "schema": "SystemSetting",
+      "description": "Configurações institucionais do sistema"
+    },
+    "/leads/{leadId}": {
+      "schema": "Lead",
+      "description": "Leads e contatos do funil comercial"
+    },
+    "/crm_automations/{automationId}": {
+      "schema": "CrmAutomation",
+      "description": "Regras de automação do CRM"
+    },
+    "/satisfaction_surveys/{surveyId}": {
+      "schema": "SatisfactionSurvey",
+      "description": "Pesquisas de satisfação e avaliações NPS"
+    },
+    "/tab_settings/{tabId}": {
+      "schema": "TabSetting",
+      "description": "Configurações específicas de cada módulo e aba"
+    },
+    "/folha_teachers/{teacherId}": {
+      "schema": "FolhaPontoTeacher",
+      "description": "Professores cadastrados na folha de ponto"
+    },
+    "/folha_turmas/{turmaId}": {
+      "schema": "FolhaPontoTurma",
+      "description": "Turmas e horários regulares de professores"
+    },
+    "/folha_records/{recordId}": {
+      "schema": "FolhaPontoRecord",
+      "description": "Lançamentos e diário de aulas dos professores"
+    },
+    "/whatsapp_chats/{chatId}": {
+      "schema": "WhatsappChat",
+      "description": "Conversas e contatos do WhatsApp"
+    },
+    "/whatsapp_messages/{messageId}": {
+      "schema": "WhatsappMessage",
+      "description": "Mensagens de texto e arquivos do WhatsApp"
+    },
+    "/exercises_catalog/{exerciseId}": {
+      "schema": "ExerciseCatalogItem",
+      "description": "Catálogo completo de exercícios musculares"
+    },
+    "/exercise_load_history/{logId}": {
+      "schema": "ExerciseLoadLog",
+      "description": "Histórico de cargas e repetições dos alunos"
+    },
+    "/security_audit_logs/{logId}": {
+      "schema": "SecurityAuditLog",
+      "description": "Logs de auditoria e segurança"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "VB SPORT ADM",
+  "description": "Sistema de Gestão Fitness e Academia - VB SPORT ADM",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
