@@ -136,11 +136,11 @@ export const ComandasTab: React.FC<ComandasTabProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-blue-600" />
-            Comandas de Consumo (Lanchonete / Recepção)
+            <Coffee className="h-5 w-5 text-amber-600" />
+            Lanchonete da Empresa & Comandas
           </h1>
           <p className="text-xs text-slate-500">
-            Controle de consumo em aberto por aluno, venda rápida de suplementos e bebidas
+            Controle da lanchonete, consumos em aberto por aluno, pedidos de shakes, lanches e bebidas
           </p>
         </div>
 
@@ -150,10 +150,10 @@ export const ComandasTab: React.FC<ComandasTabProps> = ({
               setNewComandaNumber((comandas.length + 101).toString());
               setShowNewComandaModal(true);
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700 transition-colors shadow-xs"
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            Abrir Comanda
+            Abrir Comanda / Pedido
           </button>
         </div>
       </div>
@@ -213,10 +213,10 @@ export const ComandasTab: React.FC<ComandasTabProps> = ({
             </span>
           </div>
           <div className="mt-2 text-sm font-bold text-slate-900 truncate">
-            Água Crystal & Barra Crisp
+            {comandas.some(c => c.items && c.items.length > 0) ? 'Água & Suplementos' : 'Nenhum consumo registrado'}
           </div>
           <div className="mt-1 text-[11px] text-slate-500">
-            <span>Consumo direto na recepção</span>
+            <span>{comandas.length > 0 ? 'Baseado nas comandas ativas' : 'Aguardando novas comandas'}</span>
           </div>
         </div>
       </div>

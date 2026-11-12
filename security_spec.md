@@ -65,10 +65,10 @@
    { "id": "wk-1", "studentId": "std-1", "title": "Bomb", "exercises": Array(50000).fill("spam") }
    ```
 
-8. **Payload 8 (Access Log Timestamp Tampering)**:
-   Attempting to update an existing catraca access log to forge past entry.
+8. **Payload 8 (Attendance Tampering)**:
+   Attempting to update an existing attendance log to forge past entry.
    ```json
-   { "id": "log-1", "timestamp": "2020-01-01T00:00:00Z", "status": "liberado" }
+   { "id": "log-1", "timestamp": "2020-01-01T00:00:00Z", "status": "presente" }
    ```
 
 9. **Payload 9 (Stock Movement Ghost Adjustments)**:

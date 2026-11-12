@@ -205,7 +205,7 @@ export const WhatsappDisparosView: React.FC<WhatsappDisparosViewProps> = ({
                   className="w-full rounded-lg border border-slate-200 p-2.5 text-xs focus:border-blue-500 focus:outline-hidden"
                 >
                   <option value="Alunos Inadimplentes com mensalidade vencida">Alunos Inadimplentes (Débito em aberto)</option>
-                  <option value="Alunos Inativos sem treinar há mais de 15 dias">Alunos Inativos (Sem passar na catraca &gt; 15 dias)</option>
+                  <option value="Alunos Inativos sem treinar há mais de 15 dias">Alunos Inativos (Sem frequência &gt; 15 dias)</option>
                   <option value="Todos os Alunos Ativos">Todos os Alunos Ativos (Comunicados gerais)</option>
                   <option value="Leads que fizeram aula experimental e não matricularam">Leads de Aula Experimental (Follow-up de Vendas)</option>
                   <option value="Aniversariantes do Mês">Aniversariantes do Mês (Parabéns e cortesia)</option>

@@ -1,4 +1,4 @@
-import { Student, AccessLog, FinancialTransaction, Lead, ClassSession, WorkoutPlan } from '../../../types';
+import { Student, FinancialTransaction, Lead, ClassSession, WorkoutPlan } from '../../../types';
 
 export interface SubTabGoal {
   id: string;
@@ -86,17 +86,7 @@ export const DEFAULT_GOALS_BY_SUBTAB: Record<string, SubTabGoalsConfig> = {
       { id: 'cac_target', label: 'CAC Máximo por Aluno', targetValue: 'R$ 45', numericTarget: 45, unit: 'R$', isInverse: true, description: 'Custo de aquisição em tráfego e comissões' }
     ]
   },
-  operacional: {
-    subTab: 'operacional',
-    focusMode: 'equilibrado',
-    customNotes: 'Evitar sobrecarga nos horários de pico e garantir 100% dos maquinários de cardio operacionais.',
-    goals: [
-      { id: 'peak_occupancy', label: 'Ocupação no Pico Máximo', targetValue: '85%', numericTarget: 85, unit: '%', isInverse: true, description: 'Não ultrapassar a lotação para manter conforto' },
-      { id: 'equipment_uptime', label: 'Disponibilidade de Equipamentos', targetValue: '98%', numericTarget: 98, unit: '%', description: 'Aparelhos e esteiras sem pane' },
-      { id: 'avg_workout_duration', label: 'Duração Média de Treino', targetValue: '55 min', numericTarget: 55, unit: 'min', description: 'Rotatividade saudável no salão de musculação' },
-      { id: 'turnstile_incident_rate', label: 'Incidentes de Acesso Catraca', targetValue: '2%', numericTarget: 2, unit: '%', isInverse: true, description: 'Falhas de biometria ou cartão' }
-    ]
-  },
+
   clientes: {
     subTab: 'clientes',
     focusMode: 'equilibrado',
@@ -157,7 +147,6 @@ export const DEFAULT_GOALS_BY_SUBTAB: Record<string, SubTabGoalsConfig> = {
 export const SUBTAB_TITLES: Record<string, string> = {
   crm: 'CRM & Funil Comercial',
   gerencial: 'Gerencial & DRE Executivo',
-  operacional: 'Operacional & Fluxo de Catraca',
   clientes: 'Clientes, Retenção & Churn',
   financeiro: 'Financeiro & Fluxo de Caixa',
   agenda: 'Agenda & Ocupação de Aulas',
@@ -205,30 +194,29 @@ export function extractSubTabLiveMetrics(
   subTab: string,
   data: {
     students: Student[];
-    accessLogs: AccessLog[];
     transactions: FinancialTransaction[];
     leads?: Lead[];
     classes?: ClassSession[];
     workouts?: WorkoutPlan[];
   }
 ): Record<string, any> {
-  const { students, accessLogs, transactions, leads = [], classes = [], workouts = [] } = data;
+  const { students, transactions, leads = [], classes = [], workouts = [] } = data;
 
-  const totalStudents = students.length || 202;
-  const activeStudents = students.filter(s => s.status === 'ativo').length || 182;
-  const overdueStudents = students.filter(s => s.status === 'inadimplente' || (s.pendingAmount && s.pendingAmount > 0)).length || 6;
-  const frozenStudents = students.filter(s => s.status === 'trancado').length || 14;
+  const totalStudents = students.length;
+  const activeStudents = students.filter(s => s.status === 'ativo').length;
+  const overdueStudents = students.filter(s => s.status === 'inadimplente' || (s.pendingAmount && s.pendingAmount > 0)).length;
+  const frozenStudents = students.filter(s => s.status === 'trancado').length;
 
   const totalRevenue = transactions
     .filter(t => t.type === 'receita')
-    .reduce((acc, curr) => acc + (curr.amount || 0), 0) || 54890.00;
+    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
   const totalExpenses = transactions
     .filter(t => t.type === 'despesa')
-    .reduce((acc, curr) => acc + (curr.amount || 0), 0) || 35446.70;
+    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
   const ebitda = totalRevenue - totalExpenses;
-  const ebitdaMargin = totalRevenue > 0 ? ((ebitda / totalRevenue) * 100).toFixed(1) : '35.4';
+  const ebitdaMargin = totalRevenue > 0 ? ((ebitda / totalRevenue) * 100).toFixed(1) : '0.0';
 
   switch (subTab) {
     case 'crm': {
@@ -266,20 +254,6 @@ export function extractSubTabLiveMetrics(
       };
     }
 
-    case 'operacional': {
-      const todayLogs = accessLogs.length || 184;
-      return {
-        acessosHoje: todayLogs,
-        lotacaoAtualSalão: 42,
-        capacidadeMaxima: 75,
-        taxaOcupacaoAtual: '56%',
-        horarioPicoMaximo: '18:00 às 19:30 (41 acessos simultâneos, 98% da capacidade)',
-        tempoMedioPermanencia: '58 minutos',
-        equipamentosOperacionais: '17 de 18 (94.4%)',
-        alertaManutencao: 'Esteira Movement RT250 #04 (Ajuste de lona pendente)',
-        taxaBloqueiosCatraca: '1.2% (resolvidos no balcão)'
-      };
-    }
 
     case 'clientes': {
       const churnRate = 1.8;
@@ -568,103 +542,7 @@ export function generateDeterministicReport(
       };
     }
 
-    case 'operacional': {
-      return {
-        subTab,
-        subTabTitle,
-        generatedAt: now,
-        model: 'Gemini 3.8 Flash (Modo Assistido)',
-        healthScore: 78,
-        status: 'atencao',
-        statusSummary: 'Operação estável, porém com ponto de atenção crítico no pico das 18h e esteira em reparo.',
-        executiveSummary: `A academia registrou ${metrics.acessosHoje || 184} acessos hoje. No horário de pico das 18:00 às 19:30, a ocupação atingiu ${metrics.taxaOcupacaoAtual || '98%'} da capacidade máxima (41 pessoas simultâneas no salão), gerando filas ocasionais nos aparelhos de peito e esteiras. Além disso, a Esteira Movement RT250 #04 está em manutenção preventiva agendada para ajuste de lona, exigindo conclusão rápida para não impactar o horário nobre.`,
-        goalsComparison: [
-          {
-            goalId: 'peak_occupancy',
-            goalName: 'Ocupação no Horário de Pico',
-            targetValue: 'Máx. 85%',
-            currentValue: '98%',
-            status: 'em_risco',
-            deviation: '+13% acima do recomendado',
-            comment: 'Lotação máxima atingida às 18h. Risco de reclamações sobre revezamento de aparelhos.'
-          },
-          {
-            goalId: 'equipment_uptime',
-            goalName: 'Disponibilidade de Equipamentos',
-            targetValue: '98%',
-            currentValue: '94.4%',
-            status: 'em_risco',
-            deviation: '-3.6%',
-            comment: '1 esteira parada em manutenção reduz a capacidade do setor aeróbico.'
-          },
-          {
-            goalId: 'avg_workout_duration',
-            goalName: 'Duração Média de Treino',
-            targetValue: '55 min',
-            currentValue: '58 min',
-            status: 'atingida',
-            deviation: '+3 min',
-            comment: 'Boa rotatividade geral no salão.'
-          },
-          {
-            goalId: 'turnstile_incident_rate',
-            goalName: 'Incidentes na Catraca',
-            targetValue: '< 2%',
-            currentValue: '1.2%',
-            status: 'atingida',
-            deviation: '-0.8% (Excelente)',
-            comment: 'Apenas 2 bloqueios tratados rapidamente pela equipe de recepção.'
-          }
-        ],
-        keyStrengths: [
-          'Catraca biométrica e QR Code operando com altíssima agilidade (1.2% de incidentes).',
-          'Ar-condicionado e ventilação mantiveram o conforto térmico mesmo no pico de 41 alunos.',
-          'Salão de spinning e salas de lutas livres de avarias e com manutenção em dia.'
-        ],
-        criticalRisks: [
-          'Gargalo no setor de cardio entre 17h45 e 19h15 enquanto a esteira #04 estiver inativa.',
-          'Sobrecarga de atendimento na recepção durante a troca de turnos das 18h.',
-          'Uso excessivo de celular entre séries prolongando o tempo nos aparelhos mais disputados (Leg Press e Crossover).'
-        ],
-        actionableSuggestions: [
-          {
-            id: 'op_act_1',
-            title: 'Conclusão Urgente do Ajuste da Esteira #04',
-            description: 'Cobrar o técnico responsável para finalizar a calibragem da lona antes das 16h.',
-            priority: 'alta',
-            timeframe: 'Imediato (Hoje)',
-            expectedImpact: 'Restauração imediata de 100% da capacidade aeróbica no horário nobre',
-            suggestedAction: 'Acompanhar ordem de serviço no estoque/manutenção',
-            targetTab: 'catraca'
-          },
-          {
-            id: 'op_act_2',
-            title: 'Incentivo de Horário "Happy Hour Fit" (13h às 16h)',
-            description: 'Criar benefício exclusivo (ex: dose de pré-treino na comanda ou desconto) para alunos que puderem treinar à tarde.',
-            priority: 'media',
-            timeframe: 'Próxima semana',
-            expectedImpact: 'Deslocamento de 8 a 12 alunos do pico noturno para a tarde, aliviando o salão',
-            suggestedAction: 'Publicar informativo no mural e WhatsApp',
-            targetTab: 'crm'
-          },
-          {
-            id: 'op_act_3',
-            title: 'Aviso Amigável de Conscientização sobre Revezamento',
-            description: 'Colocar pequenos displays discretos nos aparelhos de polia e leg press incentivando o revezamento cordial.',
-            priority: 'baixa',
-            timeframe: 'Próximos 5 dias',
-            expectedImpact: 'Redução de tempo de espera e aumento da satisfação dos alunos',
-            suggestedAction: 'Imprimir material padronizado com identidade da academia'
-          }
-        ],
-        decisionSimulation: {
-          scenario: 'Manutenção da esteira concluída + campanhas de redistribuição de horário',
-          ifActionTaken: 'A ocupação no pico recua para 82% com índice de satisfação do aluno atingindo 95%.',
-          ifNoAction: 'Reclamações sobre filas de esteira e risco de atrito entre alunos em horários de pico.'
-        },
-        keyMetricsSnapshot: metrics
-      };
-    }
+
 
     case 'clientes': {
       return {
@@ -675,7 +553,7 @@ export function generateDeterministicReport(
         healthScore: 86,
         status: 'otimo',
         statusSummary: 'Taxa de evasão (churn) sob controle estrito, com 4 alunos em alerta de ausência.',
-        executiveSummary: `A base ativa conta com ${metrics.alunosAtivos || 182} alunos e uma taxa de churn mensal exemplar de ${metrics.taxaChurnMensal || '1.8%'} (abaixo do teto de 2.0%). Há 4 alunos identificados com mais de 15 dias consecutivos de ausência no sistema da catraca. O índice de inadimplência está em 3.0%, dentro da faixa de tolerância.`,
+        executiveSummary: `A base ativa conta com ${metrics.alunosAtivos || 182} alunos e uma taxa de churn mensal exemplar de ${metrics.taxaChurnMensal || '1.8%'} (abaixo do teto de 2.0%). Há 4 alunos identificados com mais de 15 dias consecutivos de ausência no controle de frequência. O índice de inadimplência está em 3.0%, dentro da faixa de tolerância.`,
         goalsComparison: [
           {
             goalId: 'churn_rate',
@@ -915,7 +793,7 @@ export function generateDeterministicReport(
         keyStrengths: [
           'Turmas de Spinning e Pilates com 100% das vagas disputadas com antecedência.',
           'Instrutores altamente avaliados com assiduidade exemplar de 98.5%.',
-          'Integração de check-in rápido pelo painel ou catraca sem filas no início das aulas.'
+          'Integração de check-in rápido pelo painel ou lista de presença sem filas no início das aulas.'
         ],
         criticalRisks: [
           'Alunos na lista de espera do Pilates podem migrar para estúdios externos se não atendidos.',

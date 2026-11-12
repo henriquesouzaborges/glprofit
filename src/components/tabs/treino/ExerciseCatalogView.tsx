@@ -11,7 +11,8 @@ import {
   Sparkles,
   BookOpen,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Edit3
 } from 'lucide-react';
 import { ExerciseCatalogItem, MuscleGroup, ExerciseEquipment } from '../../../types';
 import { EXERCISE_CATALOG } from './exerciseDatabase';
@@ -291,6 +292,20 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewExercise(ex);
+                            setShowNewCustomForm(true);
+                          }}
+                          className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                          title="Editar Exercício"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                          <span className="hidden sm:inline text-[11px]">Editar</span>
+                        </button>
+
                         {onSelectExercise && (
                           <button
                             type="button"
@@ -298,7 +313,7 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
                               e.stopPropagation();
                               onSelectExercise(ex);
                             }}
-                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs active:scale-95 transition-all"
+                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs active:scale-95 transition-all cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Adicionar</span>

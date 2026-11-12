@@ -14,7 +14,7 @@
         "active": { "type": "boolean" },
         "createdAt": { "type": "string", "maxLength": 64 },
         "lastLogin": { "type": "string", "maxLength": 64 },
-        "password": { "type": "string", "maxLength": 128 },
+        "mustChangePassword": { "type": "boolean" },
         "permissions": { "type": "array" }
       },
       "required": ["id", "name", "email", "role", "active"]
@@ -34,9 +34,29 @@
         "birthDate": { "type": "string", "maxLength": 64 },
         "cpf": { "type": "string", "maxLength": 32 },
         "emergencyContact": { "type": "string", "maxLength": 128 },
-        "photo": { "type": "string", "maxLength": 512 }
+        "photo": { "type": "string", "maxLength": 512 },
+        "consentLgpd": { "type": "boolean" },
+        "consentLgpdDate": { "type": "string", "maxLength": 64 },
+        "consentLgpdVersion": { "type": "string", "maxLength": 32 }
       },
       "required": ["id", "name", "status"]
+    },
+    "EmpresaCliente": {
+      "title": "EmpresaCliente",
+      "description": "Empresas clientes B2B do sistema SaaS GL PRO FIT",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "razaoSocial": { "type": "string", "maxLength": 128 },
+        "cnpj": { "type": "string", "maxLength": 32 },
+        "responsavel": { "type": "string", "maxLength": 128 },
+        "valorMensal": { "type": "number" },
+        "limiteUsuarios": { "type": "number" },
+        "vencimento": { "type": "string", "maxLength": 32 },
+        "status": { "type": "string", "enum": ["ativo", "bloqueado"] },
+        "allowedModules": { "type": "array" }
+      },
+      "required": ["id", "razaoSocial", "cnpj", "status"]
     },
     "Plan": {
       "title": "Plan",
@@ -225,21 +245,6 @@
         "instructor": { "type": "string", "maxLength": 128 }
       },
       "required": ["id", "title", "start", "end"]
-    },
-    "AccessLog": {
-      "title": "AccessLog",
-      "description": "Registro de acesso na catraca física ou virtual",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "studentId": { "type": "string", "maxLength": 128 },
-        "studentName": { "type": "string", "maxLength": 128 },
-        "timestamp": { "type": "string", "maxLength": 64 },
-        "status": { "type": "string", "enum": ["liberado", "bloqueado", "alerta"] },
-        "type": { "type": "string", "maxLength": 64 },
-        "reason": { "type": "string", "maxLength": 256 }
-      },
-      "required": ["id", "studentName", "timestamp", "status"]
     },
     "TeamTask": {
       "title": "TeamTask",
@@ -528,10 +533,6 @@
     "/calendar_events/{eventId}": {
       "schema": "CalendarEvent",
       "description": "Eventos e compromissos do calendário"
-    },
-    "/access_logs/{logId}": {
-      "schema": "AccessLog",
-      "description": "Logs de liberação e bloqueio na catraca"
     },
     "/team_tasks/{taskId}": {
       "schema": "TeamTask",

@@ -35,7 +35,6 @@ import {
   ClassSession, 
   Product, 
   Comanda, 
-  AccessLog, 
   PayRecurringCharge, 
   PaymentLink 
 } from '../../../types';
@@ -58,7 +57,6 @@ interface BackupManualConfigViewProps {
   classes?: ClassSession[];
   products?: Product[];
   comandas?: Comanda[];
-  accessLogs?: AccessLog[];
   recurringCharges?: PayRecurringCharge[];
   paymentLinks?: PaymentLink[];
   onShowNotification: (msg: string, type?: 'success' | 'info') => void;
@@ -74,7 +72,6 @@ export const BackupManualConfigView: React.FC<BackupManualConfigViewProps> = ({
   classes: propClasses,
   products: propProducts,
   comandas: propComandas,
-  accessLogs: propAccessLogs,
   recurringCharges: propRecurring,
   paymentLinks: propPaymentLinks,
   onShowNotification
@@ -164,12 +161,7 @@ export const BackupManualConfigView: React.FC<BackupManualConfigViewProps> = ({
       } catch { return []; }
     })();
 
-    const accessLogsList: AccessLog[] = propAccessLogs || (() => {
-      try {
-        const s = localStorage.getItem('vbsport_access_logs');
-        return s ? JSON.parse(s) : [];
-      } catch { return []; }
-    })();
+
 
     const recurringList: PayRecurringCharge[] = propRecurring || (() => {
       try {
@@ -195,7 +187,6 @@ export const BackupManualConfigView: React.FC<BackupManualConfigViewProps> = ({
       classes: classesList,
       products: productsList,
       comandas: comandasList,
-      accessLogs: accessLogsList,
       recurringCharges: recurringList,
       paymentLinks: paymentLinksList,
       systemUsers: usersList,
@@ -209,7 +200,6 @@ export const BackupManualConfigView: React.FC<BackupManualConfigViewProps> = ({
     propClasses,
     propProducts,
     propComandas,
-    propAccessLogs,
     propRecurring,
     propPaymentLinks,
     settings
@@ -242,7 +232,6 @@ export const BackupManualConfigView: React.FC<BackupManualConfigViewProps> = ({
           totalProdutos: currentData.products.length,
           totalComandas: currentData.comandas.length,
           totalUsuarios: currentData.systemUsers.length,
-          totalAcessosCatraca: currentData.accessLogs.length,
           totalCobrancasRecorrentes: currentData.recurringCharges.length,
           totalLinksPagamento: currentData.paymentLinks.length,
         }
@@ -254,7 +243,6 @@ export const BackupManualConfigView: React.FC<BackupManualConfigViewProps> = ({
       aulasEHorarios: currentData.classes,
       produtosEstoque: currentData.products,
       comandasConsumo: currentData.comandas,
-      acessosCatraca: currentData.accessLogs,
       cobrancasRecorrentes: currentData.recurringCharges,
       linksPagamento: currentData.paymentLinks,
       usuariosSistema: currentData.systemUsers.map(u => ({

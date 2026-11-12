@@ -57,7 +57,7 @@ export const PartnerSchoolLicenseModal: React.FC<PartnerSchoolLicenseModalProps>
     planPrice: 299.00,
     expirationDate: '2026-11-30',
     isWarningBannerActive: true,
-    customWarningMessage: 'Evite a suspensão do acesso à catraca e app do aluno.',
+    customWarningMessage: 'Evite a suspensão do acesso ao sistema e app do aluno.',
     status: 'ativa',
     pixKey: 'marinho.gianluca@gmail.com',
     notes: ''
@@ -148,8 +148,8 @@ export const PartnerSchoolLicenseModal: React.FC<PartnerSchoolLicenseModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
+      <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden mb-8 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         
         {/* Header com Identificação Master */}
         <div className="p-5 sm:p-6 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">

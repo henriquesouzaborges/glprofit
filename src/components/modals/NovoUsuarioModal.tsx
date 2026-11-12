@@ -27,9 +27,9 @@ const AVAILABLE_MODULES = ALL_SYSTEM_MODULES;
 
 const DEFAULT_PERMISSIONS_BY_ROLE: Record<SystemUserRole, string[]> = {
   admin: ALL_SYSTEM_MODULES.map(m => m.id),
-  gerente: ['inicio', 'dashboards', 'alunos', 'treinos', 'agenda', 'catraca', 'financeiro', 'pay', 'vendas', 'comandas', 'estoque', 'crm', 'whatsapp', 'relatorios'],
+  gerente: ['inicio', 'dashboards', 'alunos', 'treinos', 'agenda', 'financeiro', 'pay', 'vendas', 'comandas', 'estoque', 'crm', 'whatsapp', 'relatorios'],
   treinador: ['inicio', 'alunos', 'treinos', 'agenda'],
-  recepcao: ['inicio', 'alunos', 'agenda', 'catraca', 'vendas', 'comandas', 'whatsapp'],
+  recepcao: ['inicio', 'alunos', 'agenda', 'vendas', 'comandas', 'whatsapp'],
   financeiro: ['inicio', 'alunos', 'financeiro', 'pay', 'vendas', 'comandas', 'estoque', 'relatorios'],
   aluno: ['inicio', 'treinos', 'agenda'],
 };
@@ -131,12 +131,12 @@ export const NovoUsuarioModal: React.FC<NovoUsuarioModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 overflow-y-auto bg-slate-900/60 backdrop-blur-xs"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden mb-8 animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/70">
           <div className="flex items-center gap-3">

@@ -9,7 +9,6 @@ import {
   WorkoutPlan, 
   ExerciseCatalogItem, 
   ExerciseLoadLog,
-  AccessLog, 
   Plan, 
   WhatsappChat, 
   WhatsappMessage, 
@@ -82,16 +81,7 @@ export type SubscriptionEntity = PayRecurringCharge & {
 };
 
 // ==========================================
-// 5. ACCESS LOGS & CATRACA VIRTUAL
-// ==========================================
-export type AccessLogEntity = AccessLog & {
-  createdAt?: string;
-  turnstileId?: string;
-  deviceIp?: string;
-};
-
-// ==========================================
-// 6. PRODUCTS & ORDERS (PDV / COMANDAS)
+// 5. PRODUCTS & ORDERS (PDV / COMANDAS)
 // ==========================================
 export type ProductEntity = Product & {
   createdAt?: string;
@@ -115,7 +105,6 @@ export interface MigrationState {
     workouts: number;
     chats: number;
     messages: number;
-    accessLogs: number;
     transactions: number;
     products: number;
   };

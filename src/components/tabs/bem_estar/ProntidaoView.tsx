@@ -41,7 +41,24 @@ export const ProntidaoView: React.FC<ProntidaoViewProps> = ({
   onNavigateToPainMap
 }) => {
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
-  const activeStudent = students.find(s => s.id === selectedStudentId) || students[0];
+  const activeStudent = (students && students.find(s => s.id === selectedStudentId)) || students[0] || {
+    id: 'std-empty',
+    name: 'Nenhum Aluno Selecionado',
+    code: 'AL-0000',
+    email: '',
+    phone: '',
+    status: 'cancelado',
+    planId: 'plan-free',
+    planName: 'Sem Plano',
+    planPrice: 0,
+    startDate: '2026-01-01',
+    endDate: '2026-01-01',
+    dueDate: '2026-01-01',
+    pendingAmount: 0,
+    photo: '',
+    birthDate: '2000-01-01',
+    cpf: ''
+  };
 
   const generateWhatsAppMessage = (chk: WellnessCheckin) => {
     const periodLabel = chk.period === 'manha' ? 'Manhã' : chk.period === 'tarde' ? 'Tarde' : 'Noite';

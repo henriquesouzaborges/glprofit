@@ -22,7 +22,7 @@ import {
   Calendar,
   AlertTriangle
 } from 'lucide-react';
-import { Student, AccessLog, SystemUser } from '../../types';
+import { Student, SystemUser } from '../../types';
 import { hasTabPermission } from '../../services/userService';
 import { 
   isMasterAdministrator, 
@@ -35,11 +35,9 @@ import { PartnerSchoolLicenseModal } from '../modals/PartnerSchoolLicenseModal';
 
 interface InicioTabProps {
   students?: Student[];
-  accessLogs?: AccessLog[];
   transactions?: any[];
   onOpenNewStudent?: () => void;
   onOpenQuickSale?: () => void;
-  onOpenTurnstile?: () => void;
   onOpenNewOpportunity?: () => void;
   onNavigateToTab?: (tab: string) => void;
   onSelectStudent?: (student: Student) => void;
@@ -48,10 +46,8 @@ interface InicioTabProps {
 
 export const InicioTab: React.FC<InicioTabProps> = ({
   students = [],
-  accessLogs = [],
   onOpenNewStudent = () => {},
   onOpenQuickSale = () => {},
-  onOpenTurnstile = () => {},
   onOpenNewOpportunity = () => {},
   onNavigateToTab = (_tab: string) => {},
   onSelectStudent = (_student: Student) => {},
@@ -105,7 +101,7 @@ export const InicioTab: React.FC<InicioTabProps> = ({
       list.push({
         id: 'notif-1',
         title: 'Mensalidade Pendente',
-        desc: `${firstOverdue.name} está com mensalidade pendente de R$ ${(firstOverdue.pendingAmount || 169.90).toFixed(2).replace('.', ',')}. Catraca com bloqueio preventivo automático.`,
+        desc: `${firstOverdue.name} está com mensalidade pendente de R$ ${(firstOverdue.pendingAmount || 169.90).toFixed(2).replace('.', ',')}. Régua de cobrança preventiva ativa.`,
         date: 'Hoje, 08:30',
         tag: 'Cobrança Financeira',
         isAlert: true
@@ -241,7 +237,7 @@ export const InicioTab: React.FC<InicioTabProps> = ({
             </div>
 
             <span className="hidden lg:inline text-slate-600 pl-2 border-l border-slate-200 text-xs">
-              {activeLicenseForBanner.customWarningMessage || 'Evite a perda dos benefícios e bloqueio da catraca no VB SPORT.'}
+              {activeLicenseForBanner.customWarningMessage || 'Evite a perda dos benefícios e interrupção do acesso ao sistema.'}
             </span>
           </div>
 
@@ -428,18 +424,13 @@ export const InicioTab: React.FC<InicioTabProps> = ({
               )}
             </div>
 
-            {/* Status da Catraca com Registros Reais */}
+            {/* Status do Sistema em Tempo Real */}
             <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Catraca & Catraca Virtual Online ({accessLogs.length} acessos registrados na base)</span>
+                <span>Servidor & Banco de Dados em Nuvem Online</span>
               </div>
-              <button
-                onClick={onOpenTurnstile}
-                className="text-blue-600 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                Abrir Catraca <ChevronRight className="h-3 w-3" />
-              </button>
+              <span className="text-slate-400 font-medium">Sincronização Ativa</span>
             </div>
           </div>
         </div>
@@ -523,7 +514,7 @@ export const InicioTab: React.FC<InicioTabProps> = ({
 
       {/* MODAL DE RENOVAÇÃO DE CONTRATO (QUANDO ACIONADO PELA ESCOLA PARCEIRA) */}
       {showRenewModal && activeLicenseForBanner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95">
             <div className="flex items-center gap-2.5 text-red-600 border-b border-slate-100 pb-3">
               <ShieldAlert className="h-5 w-5" />
@@ -536,7 +527,7 @@ export const InicioTab: React.FC<InicioTabProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              A licença de uso do sistema para <strong>{activeLicenseForBanner.schoolName}</strong> está no período de renovação. Garanta a continuidade dos acessos à catraca, app do aluno e financeiro.
+              A licença de uso do sistema para <strong>{activeLicenseForBanner.schoolName}</strong> está no período de renovação. Garanta a continuidade dos acessos ao sistema, app do aluno e financeiro.
             </p>
 
             <div className="rounded-xl bg-blue-50 p-4 border border-blue-100 text-xs space-y-2">

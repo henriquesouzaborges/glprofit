@@ -7,56 +7,16 @@ export const INITIAL_SYSTEM_USERS: SystemUser[] = [
     email: 'marinho.gianluca@gmail.com',
     role: 'admin',
     phone: '(11) 98765-4321',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    avatar: '',
     department: 'Diretoria Executiva',
     active: true,
     createdAt: '2026-01-10',
-    lastLogin: 'Hoje, 08:15',
-    password: 'admin@glprofit',
+    lastLogin: 'Hoje',
     permissions: [
       'inicio', 'dashboards', 'alunos', 'professores', 'treinos', 'avaliacoes', 'nutricao', 'bem_estar', 'agenda', 
-      'catraca', 'financeiro', 'pay', 'vendas', 'comandas', 'estoque', 
-      'crm', 'whatsapp', 'relatorios', 'configuracoes'
+      'financeiro', 'pay', 'vendas', 'comandas', 'estoque', 
+      'crm', 'whatsapp', 'relatorios', 'empresas_clientes', 'configuracoes'
     ]
-  },
-  {
-    id: 'usr-2',
-    name: 'Recepção Matriz (Turno Diurno)',
-    email: 'recepcao@vbsport.com.br',
-    role: 'recepcao',
-    phone: '(11) 97123-4567',
-    department: 'Atendimento & PDV',
-    active: true,
-    createdAt: '2026-02-01',
-    lastLogin: 'Hoje, 07:00',
-    password: 'recepcao@123',
-    permissions: ['inicio', 'alunos', 'agenda', 'catraca', 'vendas', 'comandas', 'whatsapp', 'configuracoes']
-  },
-  {
-    id: 'usr-3',
-    name: 'Prof. Rodrigo Tavares',
-    email: 'rodrigo.tavares@vbsport.com.br',
-    role: 'treinador',
-    phone: '(11) 98222-1144',
-    department: 'Musculação & Avaliações',
-    active: true,
-    createdAt: '2026-03-15',
-    lastLogin: 'Ontem, 19:40',
-    password: 'treino@123',
-    permissions: ['inicio', 'alunos', 'treinos', 'avaliacoes', 'nutricao', 'bem_estar', 'agenda', 'configuracoes']
-  },
-  {
-    id: 'usr-4',
-    name: 'Amanda Souza',
-    email: 'financeiro@vbsport.com.br',
-    role: 'financeiro',
-    phone: '(11) 99333-8822',
-    department: 'Controladoria & Contas',
-    active: true,
-    createdAt: '2026-04-10',
-    lastLogin: '21/09/2026',
-    password: 'financeiro@123',
-    permissions: ['inicio', 'alunos', 'financeiro', 'pay', 'vendas', 'comandas', 'estoque', 'relatorios', 'configuracoes']
   }
 ];
 
@@ -163,7 +123,7 @@ export const ALL_SYSTEM_MODULES: SystemModuleDefinition[] = [
   { id: 'alunos', label: 'Alunos & Matrículas', description: 'Cadastro, matrículas, faturas e ficha do aluno', category: 'operacional' },
   { id: 'professores', label: 'Professores & Colaboradores', description: 'Folha de ponto, tarefas e agenda da equipe técnica', category: 'operacional' },
   { id: 'agenda', label: 'Agenda, Turmas & Locações', description: 'Grade horária, check-in e reserva de quadras', category: 'operacional' },
-  { id: 'catraca', label: 'Catraca & Controle de Acesso', description: 'Controle biométrico/facial e liberação em tempo real', category: 'operacional' },
+  { id: 'empresas_clientes', label: 'Empresas Clientes (B2B SaaS)', description: 'Gestão de contratos, licenciamento e liberação de módulos por cliente', category: 'core' },
   { id: 'crm', label: 'CRM & Funil de Vendas', description: 'Gestão de leads, follow-up e oportunidades', category: 'operacional' },
   { id: 'whatsapp', label: 'WhatsApp Multi-Atendimento', description: 'Multi-atendimento, disparo de mensagens e avisos (Em breve • Fase 2)', category: 'operacional' },
   { id: 'financeiro', label: 'Financeiro, Caixa & DRE', description: 'Contas a pagar/receber, conciliação e DRE', category: 'financeiro' },
@@ -172,7 +132,7 @@ export const ALL_SYSTEM_MODULES: SystemModuleDefinition[] = [
   { id: 'bem_estar', label: 'Questionário de Bem-Estar', description: 'Monitoramento diário de sono, PSE, EVA, estresse, prontidão e matriz do elenco', category: 'operacional' },
   { id: 'avaliacoes', label: 'Avaliações Físicas', description: 'Protocolos de dobras (Pollock), perimetria, bioimpedância, testes e biometria inicial', category: 'operacional' },
   { id: 'vendas', label: 'Vendas & PDV Balcão', description: 'Venda rápida de planos, produtos e serviços', category: 'financeiro' },
-  { id: 'comandas', label: 'Comandas & Lanchonete', description: 'Consumo por comanda com débito em conta', category: 'financeiro' },
+  { id: 'comandas', label: 'Lanchonete', description: 'Controle da lanchonete da empresa, pedidos de alunos e consumos', category: 'financeiro' },
   { id: 'estoque', label: 'Estoque & Produtos', description: 'Inventário, movimentações e alerta de estoque baixo', category: 'financeiro' },
   { id: 'nutricao', label: 'Nutrição & Dietas', description: 'Planos alimentares, cálculo de macros, suplementação e bioimpedância', category: 'operacional' },
   { id: 'relatorios', label: 'Relatórios & Exportações', description: 'Exportação em Excel/PDF de faturamento e frequência', category: 'sistema' },
@@ -249,8 +209,6 @@ export const hasTabPermission = (tabId: string, user?: SystemUser | null): boole
       return perms.includes('bem_estar') || perms.includes('treino') || perms.includes('treinos');
     case 'agenda':
       return perms.includes('agenda');
-    case 'catraca':
-      return perms.includes('catraca');
     case 'financeiro':
       return perms.includes('financeiro');
     case 'pay':
@@ -267,6 +225,8 @@ export const hasTabPermission = (tabId: string, user?: SystemUser | null): boole
       return perms.includes('whatsapp');
     case 'relatorios':
       return perms.includes('relatorios');
+    case 'empresas_clientes':
+      return perms.includes('empresas_clientes');
     case 'configuracoes':
       return user.role !== 'aluno' || perms.includes('configuracoes');
     default:
@@ -295,7 +255,7 @@ export const getFirstAllowedTab = (user?: SystemUser | null): string => {
     'nutricao',
     'bem_estar',
     'relatorios',
-    'catraca',
+    'empresas_clientes',
     'configuracoes'
   ];
 

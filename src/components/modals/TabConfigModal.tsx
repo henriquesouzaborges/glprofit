@@ -12,7 +12,7 @@ import {
   Layers,
   Info
 } from 'lucide-react';
-import { TabType } from '../Sidebar';
+import { TabType } from '../../types';
 import { 
   getTabConfiguration, 
   saveTabConfiguration, 
@@ -111,7 +111,7 @@ export const TabConfigModal: React.FC<TabConfigModalProps> = ({
   const activeGroup = config.groups.find(g => g.id === activeGroupId) || config.groups[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
       <div 
         className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
         role="dialog"

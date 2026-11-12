@@ -98,8 +98,28 @@ interface DraftAssessmentSession {
   savedAt: string;
 }
 
+export const DEFAULT_STUDENT_FALLBACK: Student = {
+  id: 'std-empty',
+  name: 'Nenhum Aluno Selecionado',
+  code: 'AL-0000',
+  email: '',
+  phone: '',
+  status: 'cancelado',
+  planId: 'plan-free',
+  planName: 'Sem Plano',
+  planPrice: 0,
+  startDate: '2026-01-01',
+  endDate: '2026-01-01',
+  dueDate: '2026-01-01',
+  pendingAmount: 0,
+  photo: '',
+  birthDate: '2000-01-01',
+  cpf: ''
+};
+
 // Gerador inteligente e adaptável de histórico de avaliações para qualquer aluno
-export const getAssessmentsForStudent = (std: Student): PhysicalAssessmentData[] => {
+export const getAssessmentsForStudent = (std?: Student): PhysicalAssessmentData[] => {
+  if (!std || !std.id || std.id === 'std-empty') return [];
   try {
     const saved = localStorage.getItem(`glprofit_assessment_sessions_${std.id}`);
     if (saved) {
@@ -1111,15 +1131,20 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
   onSelectStudentId,
   onNavigateToConfig
 }) => {
-  // Aluno atualmente selecionado para operações
-  const [selectedStudent, setSelectedStudent] = useState<Student>(initialStudent || students[0]);
+  // Aluno atualmente selecionado para operações (com fallback para estado virgem)
+  const activeInitialStudent = initialStudent || (students && students.length > 0 ? students[0] : DEFAULT_STUDENT_FALLBACK);
+  const [selectedStudent, setSelectedStudent] = useState<Student>(activeInitialStudent);
 
-  // Sincroniza se a prop mudar
+  // Sincroniza se a prop mudar ou se os alunos mudarem
   useEffect(() => {
     if (initialStudent) {
       setSelectedStudent(initialStudent);
+    } else if (students && students.length > 0) {
+      setSelectedStudent(prev => (prev && prev.id !== 'std-empty' ? prev : students[0]));
+    } else {
+      setSelectedStudent(DEFAULT_STUDENT_FALLBACK);
     }
-  }, [initialStudent]);
+  }, [initialStudent, students]);
 
   const handleStudentChange = (newStudentId: string) => {
     const found = students.find(s => s.id === newStudentId);
@@ -1136,8 +1161,8 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
     }
   };
 
-  const STORAGE_KEY_SESSIONS = `glprofit_assessment_sessions_${selectedStudent.id}`;
-  const STORAGE_KEY_DRAFT = `glprofit_draft_assessment_${selectedStudent.id}`;
+  const STORAGE_KEY_SESSIONS = `glprofit_assessment_sessions_${selectedStudent?.id || 'std-empty'}`;
+  const STORAGE_KEY_DRAFT = `glprofit_draft_assessment_${selectedStudent?.id || 'std-empty'}`;
 
   // Modos de visualização da tela principal
   // 'dashboard' = Tela inicial com botões, gráficos e histórico (SEM SELEÇÃO DE ALUNO NO TOPO)
@@ -1165,7 +1190,7 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
 
   // Modal de Gerar PDF
   const [showPdfModal, setShowPdfModal] = useState(false);
-  const [pdfStudentId, setPdfStudentId] = useState<string>(selectedStudent.id);
+  const [pdfStudentId, setPdfStudentId] = useState<string>(selectedStudent?.id || 'std-empty');
   const [pdfSelectedProtocols, setPdfSelectedProtocols] = useState<string[]>([
     'anamnese',
     'dobras_cutaneas',
@@ -1176,7 +1201,7 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
   ]);
 
   // Modo Analisar Avaliações
-  const [analysisStudentId, setAnalysisStudentId] = useState<string>(selectedStudent.id);
+  const [analysisStudentId, setAnalysisStudentId] = useState<string>(selectedStudent?.id || 'std-empty');
   const [analysisSelectedIds, setAnalysisSelectedIds] = useState<string[]>([]);
   const [singleConsultationId, setSingleConsultationId] = useState<string | null>(null);
   const [isAnalysisExecuted, setIsAnalysisExecuted] = useState<boolean>(false);
@@ -1460,27 +1485,11 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
 
   // Alunos com avaliação a vencer (alertas gerenciais da academia)
   const expiringAlerts = useMemo(() => {
-    return [
-      { studentId: 'std-2', studentName: 'Lucas Tibana Cordeiro', daysLeft: -12, status: 'vencida', lastDate: '24/06/2026' },
-      { studentId: 'std-1', studentName: 'Matheus Vanderlei Fonseca', daysLeft: 5, status: 'urgente', lastDate: '12/07/2026' },
-      { studentId: 'std-3', studentName: 'Juliano Ferreira Pinto', daysLeft: 18, status: 'atencao', lastDate: '25/07/2026' },
-      { studentId: 'std-4', studentName: 'Pietro Noah Marinho', daysLeft: 42, status: 'em_dia', lastDate: '15/09/2026' },
-    ];
+    return [];
   }, []);
 
   // Dados para gráficos de Avaliações Realizadas
-  const monthlyCompletedData = [
-    { month: 'Jan', count: 18 },
-    { month: 'Fev', count: 24 },
-    { month: 'Mar', count: 32 },
-    { month: 'Abr', count: 28 },
-    { month: 'Mai', count: 36 },
-    { month: 'Jun', count: 42 },
-    { month: 'Jul', count: 39 },
-    { month: 'Ago', count: 45 },
-    { month: 'Set', count: 50 },
-    { month: 'Out', count: 38 },
-  ];
+  const monthlyCompletedData: { month: string; count: number }[] = [];
 
   // DISPARAR WHATSAPP COM RELATÓRIO OFICIAL (Colocado apenas ao gerar relatório)
   const handleShareReportWhatsApp = (targetStudent: Student, selectedModuleNames: string[]) => {
@@ -1504,9 +1513,9 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
   };
 
   // Aluno ativo na modal de PDF
-  const currentPdfStudent = students.find(s => s.id === pdfStudentId) || selectedStudent;
+  const currentPdfStudent = (students && students.find(s => s.id === pdfStudentId)) || selectedStudent || DEFAULT_STUDENT_FALLBACK;
   // Aluno ativo na tela de Análise
-  const currentAnalysisStudent = students.find(s => s.id === analysisStudentId) || selectedStudent;
+  const currentAnalysisStudent = (students && students.find(s => s.id === analysisStudentId)) || selectedStudent || DEFAULT_STUDENT_FALLBACK;
 
   return (
     <div className="space-y-6">
@@ -2904,39 +2913,17 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
                 </span>
               </div>
 
-              {/* Barras Mensais Interativas */}
+              {/* Barras Mensais Interativas / Estado Vazio */}
               <div className="pt-2">
-                <div className="flex items-end justify-between gap-2 h-44 px-2 border-b border-slate-100">
-                  {monthlyCompletedData.map((d, i) => {
-                    const heightPercent = Math.round((d.count / 50) * 100);
-                    const isMax = d.count === 50;
-
-                    return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group">
-                        <span className="text-[10px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {d.count}
-                        </span>
-                        <div
-                          style={{ height: `${heightPercent}%` }}
-                          className={`w-full max-w-[26px] rounded-t-lg transition-all cursor-pointer ${
-                            isMax 
-                              ? 'bg-blue-600 shadow-xs' 
-                              : 'bg-slate-200 group-hover:bg-blue-400'
-                          }`}
-                        />
-                        <span className="text-[10px] font-bold text-slate-500">
-                          {d.month}
-                        </span>
-                      </div>
-                    );
-                  })}
+                <div className="flex items-center justify-center h-44 px-2 border-b border-slate-100 text-xs text-slate-400">
+                  {monthlyCompletedData.length === 0 ? 'Nenhum histórico mensal de avaliações registrado.' : null}
                 </div>
               </div>
 
               {/* Protocolos Mais Realizados */}
-              <div className="pt-2 flex items-center justify-between text-xs text-slate-600 border-t border-slate-100 flex-wrap gap-2">
-                <span><strong>Distribuição:</strong> Dobras (38%) • Força (22%) • Campo (18%) • Bioimpedância (15%)</span>
-                <span className="text-[11px] text-blue-600 font-bold">Média: 35.5 avaliações/mês</span>
+              <div className="pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
+                <span><strong>Distribuição:</strong> Sem dados cadastrados</span>
+                <span className="text-[11px] text-slate-400 font-bold">Média: 0.0 avaliações/mês</span>
               </div>
             </div>
 
@@ -2950,8 +2937,8 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
                   </h3>
                   <p className="text-xs text-slate-500">Controle de renovação periódica (60 a 90 dias)</p>
                 </div>
-                <span className="text-xs font-black text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
-                  4 Alertas
+                <span className="text-xs font-black text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                  0 Alertas
                 </span>
               </div>
 
@@ -2959,60 +2946,64 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-slate-600">Conformidade da Base de Alunos</span>
-                  <span className="text-emerald-700">76% em dia</span>
+                  <span className="text-emerald-700">100% em dia</span>
                 </div>
                 <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden flex">
-                  <div style={{ width: '76%' }} className="bg-emerald-500 h-full" title="Em dia (76%)" />
-                  <div style={{ width: '14%' }} className="bg-amber-400 h-full" title="A vencer em 15 dias (14%)" />
-                  <div style={{ width: '10%' }} className="bg-rose-500 h-full" title="Vencidas (10%)" />
+                  <div style={{ width: '100%' }} className="bg-emerald-500 h-full" title="Em dia (100%)" />
                 </div>
               </div>
 
               {/* Lista Acionável de Alunos com Avaliação Vencendo */}
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {expiringAlerts.map((al, idx) => {
-                  const isExpired = al.status === 'vencida';
-                  const isUrgent = al.status === 'urgente';
+                {expiringAlerts.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-slate-400">
+                    Nenhum aluno com avaliação a vencer no momento.
+                  </div>
+                ) : (
+                  expiringAlerts.map((al, idx) => {
+                    const isExpired = al.status === 'vencida';
+                    const isUrgent = al.status === 'urgente';
 
-                  return (
-                    <div
-                      key={idx}
-                      className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-between text-xs"
-                    >
-                      <div className="space-y-0.5">
-                        <strong className="block text-slate-900 text-xs font-black">
-                          {al.studentName}
-                        </strong>
-                        <span className="text-[10px] text-slate-400">
-                          Última em: {al.lastDate}
-                        </span>
+                    return (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-between text-xs"
+                      >
+                        <div className="space-y-0.5">
+                          <strong className="block text-slate-900 text-xs font-black">
+                            {al.studentName}
+                          </strong>
+                          <span className="text-[10px] text-slate-400">
+                            Última em: {al.lastDate}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black ${
+                            isExpired 
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200' 
+                              : isUrgent 
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                                : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {isExpired ? `Vencida há ${Math.abs(al.daysLeft)}d` : `Vence em ${al.daysLeft}d`}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleStudentChange(al.studentId);
+                              setViewMode('select_protocols');
+                            }}
+                            className="px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 text-[10px] font-bold cursor-pointer"
+                          >
+                            Avaliar
+                          </button>
+                        </div>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black ${
-                          isExpired 
-                            ? 'bg-rose-100 text-rose-800 border border-rose-200' 
-                            : isUrgent 
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                              : 'bg-emerald-100 text-emerald-800'
-                        }`}>
-                          {isExpired ? `Vencida há ${Math.abs(al.daysLeft)}d` : `Vence em ${al.daysLeft}d`}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleStudentChange(al.studentId);
-                            setViewMode('select_protocols');
-                          }}
-                          className="px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 text-[10px] font-bold cursor-pointer"
-                        >
-                          Avaliar
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -3054,57 +3045,11 @@ export const AvaliacoesHubView: React.FC<AvaliacoesHubViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {students.slice(0, 5).map((st, i) => {
-                    const mockDate = ['2026-09-15', '2026-08-20', '2026-08-10', '2026-07-28', '2026-07-15'][i] || '2026-07-10';
-                    const mockWeight = [74.5, 82.0, 68.4, 76.2, 70.0][i] || 75.0;
-                    const mockFat = [14.2, 18.5, 12.8, 16.0, 15.2][i] || 15.0;
-                    const mockLean = [63.9, 66.8, 59.6, 64.0, 59.3][i] || 60.0;
-
-                    return (
-                      <tr key={st.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3 px-3">
-                          <strong className="block text-slate-900 font-bold">{st.name}</strong>
-                          <span className="text-[10px] text-slate-400">{st.code}</span>
-                        </td>
-                        <td className="py-3 px-3 font-bold text-slate-900">{mockDate}</td>
-                        <td className="py-3 px-3 text-slate-600">Pollock 7 Dobras</td>
-                        <td className="py-3 px-3 font-bold text-slate-800">{mockWeight} kg</td>
-                        <td className="py-3 px-3">
-                          <span className="px-2 py-0.5 rounded font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
-                            {mockFat}%
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 font-bold text-blue-900">{mockLean} kg</td>
-                        <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleStudentChange(st.id);
-                                setAnalysisStudentId(st.id);
-                                setSingleConsultationId(`av-${st.id}-1`);
-                                setViewMode('analyze_view');
-                              }}
-                              className="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
-                            >
-                              Consultar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPdfStudentId(st.id);
-                                setShowPdfModal(true);
-                              }}
-                              className="p-1 rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 cursor-pointer"
-                              title="Gerar PDF"
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-xs text-slate-400">
+                      Nenhuma avaliação física cadastrada no histórico. Clique em "Nova Avaliação" para realizar a primeira avaliação de um aluno.
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>

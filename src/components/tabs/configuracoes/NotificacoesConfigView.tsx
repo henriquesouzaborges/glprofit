@@ -255,75 +255,7 @@ export const NotificacoesConfigView: React.FC = () => {
       {/* EVENT TYPE TOGGLE CATEGORIES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-        {/* CATEGORY 1: CATRACA & ACESSO */}
-        <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Catraca Virtual & Acessos</h3>
-              <p className="text-xs text-slate-500">Notificações ao registrar passagens pela portaria física</p>
-            </div>
-          </div>
 
-          <div className="space-y-3">
-            {/* Event: catraca_liberada */}
-            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:bg-slate-50 transition-colors">
-              <div className="space-y-0.5 pr-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-xs font-bold text-slate-900">Acesso Liberado</span>
-                </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Alerta push a cada passagem liberada e autorizada de alunos regulares na catraca.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleToggle('catraca_liberada')}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  preferences.catraca_liberada ? 'bg-blue-600' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    preferences.catraca_liberada ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Event: catraca_bloqueada */}
-            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-rose-50/40 border border-rose-200/70 hover:bg-rose-50/70 transition-colors">
-              <div className="space-y-0.5 pr-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  <span className="text-xs font-bold text-rose-950">Acesso Bloqueado / Recusado</span>
-                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-rose-100 text-rose-700">Crítico</span>
-                </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Alerta urgente quando um aluno inadimplente ou não identificado tem a entrada travada.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleToggle('catraca_bloqueada')}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  preferences.catraca_bloqueada ? 'bg-rose-600' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    preferences.catraca_bloqueada ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* CATEGORY 2: FINANCEIRO & VENDAS */}
         <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-2xs space-y-4">

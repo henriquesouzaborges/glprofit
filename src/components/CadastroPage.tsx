@@ -198,7 +198,6 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
         createdAt: today,
         lastLogin: 'Primeiro acesso',
         department: `Aluno - ${studentForm.modality}`,
-        password: studentForm.password,
         permissions: ['inicio', 'treinos', 'agenda', 'avaliacoes', 'nutricao', 'bem_estar']
       };
 
@@ -340,7 +339,6 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
         createdAt: today,
         lastLogin: 'Primeiro acesso',
         department: `Responsável Legal (${guardianForm.relationship}) - Aluno: ${dependentStudentForm.name}`,
-        password: guardianForm.password,
         permissions: ['inicio', 'treinos', 'agenda', 'avaliacoes', 'nutricao', 'bem_estar']
       };
 

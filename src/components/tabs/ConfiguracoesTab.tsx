@@ -41,7 +41,6 @@ import {
   Database,
   ThumbsUp,
   ThumbsDown,
-  Radio,
   ArrowLeft,
   LayoutGrid,
   ChevronRight,
@@ -58,11 +57,10 @@ import {
   ClassSession,
   Product,
   Comanda,
-  AccessLog,
   PayRecurringCharge,
-  PaymentLink
+  PaymentLink,
+  TabType
 } from '../../types';
-import { TabType } from '../Sidebar';
 import { NovoUsuarioModal } from '../modals/NovoUsuarioModal';
 import { EditarUsuarioModal } from '../modals/EditarUsuarioModal';
 import { getSystemUsers, saveSystemUsers, updateSystemUser } from '../../services/userService';
@@ -98,7 +96,6 @@ export type ConfigSubTab =
   | 'pay'
   | 'vendas'
   | 'nutricao'
-  | 'catraca'
   | 'estoque'
   | 'relatorios';
 
@@ -284,14 +281,6 @@ const CONFIG_SUBTABS: SubTabItem[] = [
     targetTab: 'nutricao'
   },
   {
-    id: 'catraca',
-    label: 'Catraca & Acesso',
-    category: 'Portaria',
-    icon: ShieldCheck,
-    description: 'Tolerância de atraso, bloqueio automático e tempo de abertura do relé',
-    targetTab: 'catraca'
-  },
-  {
     id: 'estoque',
     label: 'Estoque',
     category: 'Materiais',
@@ -346,13 +335,7 @@ export const getSubTabColors = (id: ConfigSubTab) => {
         badgeBg: 'bg-slate-100 text-slate-700',
         badge: 'JSON'
       };
-    case 'catraca':
-      return {
-        iconBg: 'bg-cyan-100 text-cyan-700 group-hover:bg-cyan-600 group-hover:text-white',
-        border: 'border-cyan-200/90 hover:border-cyan-500 hover:ring-2 hover:ring-cyan-500/20',
-        badgeBg: 'bg-cyan-100 text-cyan-800',
-        badge: 'PORTARIA'
-      };
+
     case 'financeiro':
       return {
         iconBg: 'bg-amber-100 text-amber-700 group-hover:bg-amber-600 group-hover:text-white',
@@ -475,7 +458,6 @@ interface ConfiguracoesTabProps {
   classes?: ClassSession[];
   products?: Product[];
   comandas?: Comanda[];
-  accessLogs?: AccessLog[];
   recurringCharges?: PayRecurringCharge[];
   paymentLinks?: PaymentLink[];
   onImportStudents?: (imported: Student[]) => void;
@@ -497,7 +479,6 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
   classes,
   products,
   comandas,
-  accessLogs,
   recurringCharges,
   paymentLinks,
   onImportStudents,
@@ -640,22 +621,14 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
     const updatedConfig = { ...currentConfig, groups: updatedGroups };
     setCurrentConfig(updatedConfig);
 
-    // Sync with catraca formData if editing catraca rules
-    if (activeSubTab === 'catraca') {
-      if (fieldId === 'tempo_rele_segundos') {
-        // saved in config
-      }
-    }
+
   };
 
   const handleSaveCurrentModuleConfig = () => {
     if (!currentConfig) return;
     saveTabConfiguration(currentConfig);
 
-    // If on catraca, also save turnstile settings
-    if (activeSubTab === 'catraca') {
-      onSaveSettings(formData);
-    }
+
 
     showNotification(`Configurações de "${activeSubTabItem.label}" salvas com sucesso!`);
   };
@@ -1247,62 +1220,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
         </div>
       )}
 
-      {/* 3. CATRACA: Dedicated core controls + dynamic hardware rules */}
-      {activeSubTab === 'catraca' && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <ShieldCheck className="h-5 w-5 text-blue-600" />
-              <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  Políticas de Bloqueio Automático na Catraca
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Regras financeiras para liberação de giro e bloqueio de inadimplentes
-                </p>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Dias de Tolerância de Atraso (Carência)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={formData.gracePeriodDays}
-                  onChange={(e) => setFormData({ ...formData, gracePeriodDays: Number(e.target.value) })}
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:border-blue-500 focus:outline-hidden"
-                />
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Alunos com mensalidade vencida há mais dias do que este limite terão o giro bloqueado.
-                </p>
-              </div>
-
-              <div className="flex items-center pt-2 md:pt-6">
-                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-slate-50 border border-slate-200 w-full hover:bg-blue-50/50 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={formData.autoBlockOverdue}
-                    onChange={(e) => setFormData({ ...formData, autoBlockOverdue: e.target.checked })}
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <div>
-                    <div className="text-xs font-bold text-slate-900">
-                      Bloqueio Automático Ativado
-                    </div>
-                    <div className="text-[11px] text-slate-500">
-                      Gira a catraca somente para alunos adimplentes ou com liberação manual expressa da recepção.
-                    </div>
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 4. MIGRAÇÕES & IMPORTAÇÃO DE ARQUIVOS (IA GEMINI 3.5 FLASH) */}
       {activeSubTab === 'migracoes' && (
@@ -1329,7 +1247,6 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
           classes={classes}
           products={products}
           comandas={comandas}
-          accessLogs={accessLogs}
           recurringCharges={recurringCharges}
           paymentLinks={paymentLinks}
           onShowNotification={showNotification}
@@ -1430,31 +1347,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                         )}
                       </div>
 
-                      {/* Preview interativo para Presença Automática via Catraca */}
-                      {field.id === 'presenca_automatica_catraca' && (
-                        <div className={`mt-2 p-3 rounded-xl border text-xs transition-all ${
-                          field.value 
-                            ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 ring-1 ring-emerald-500/20' 
-                            : 'bg-slate-100 border-slate-200 text-slate-600'
-                        }`}>
-                          <div className="flex items-center justify-between font-bold">
-                            <span className="flex items-center gap-1.5">
-                              <Radio className={`w-3.5 h-3.5 ${field.value ? 'text-emerald-600 animate-pulse' : 'text-slate-400'}`} />
-                              <span>{field.value ? 'Sincronização Automática Ativa' : 'Sincronização Desativada'}</span>
-                            </span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                              field.value ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
-                            }`}>
-                              {field.value ? 'AUTOMÁTICO' : 'MANUAL'}
-                            </span>
-                          </div>
-                          <p className="mt-1.5 text-[11px] opacity-90 leading-relaxed">
-                            {field.value 
-                              ? 'Ao ter a entrada autorizada na catraca, o aluno recebe presença imediata com status "Presente (Catraca)" na turma agendada, sem necessidade de marcação manual do professor.'
-                              : 'A catraca registrará apenas o acesso físico na portaria. O professor deverá efetuar a chamada manualmente na Agenda (usando o sinal de dedão 👍/👎 ou o botão tradicional).'}
-                          </p>
-                        </div>
-                      )}
+
 
                       {/* NUMBER INPUT */}
                       {field.type === 'number' && (

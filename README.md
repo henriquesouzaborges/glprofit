@@ -18,4 +18,3 @@ View your app in AI Studio: https://ai.studio/apps/f4a72c22-1567-475f-a82d-18ccf
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
-# glprofit

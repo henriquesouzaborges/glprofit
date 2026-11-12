@@ -200,8 +200,15 @@ export const AgendaProfessorView: React.FC<AgendaProfessorViewProps> = ({ curren
   };
 
   const selectedTeacher = useMemo(() => {
-    return teachers.find(t => t.id === selectedTeacherId) || teachers[0];
-  }, [teachers, selectedTeacherId]);
+    return teachers.find(t => t.id === selectedTeacherId) || teachers[0] || {
+      id: currentUser?.id || 'prof-admin',
+      name: currentUser?.name || 'Gianluca Marinho',
+      email: currentUser?.email || 'gianluca@glprofit.com.br',
+      role: 'coordinator' as const,
+      avatar: currentUser?.avatar || '',
+      department: 'Direção Geral'
+    };
+  }, [teachers, selectedTeacherId, currentUser]);
 
   // Aggregate all items linked to the selected teacher
   const allTeacherItems = useMemo(() => {

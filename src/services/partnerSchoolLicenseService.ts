@@ -25,58 +25,7 @@ export interface PartnerSchoolLicense {
 
 const STORAGE_KEY = 'vbsport_partner_school_licenses';
 
-export const INITIAL_PARTNER_LICENSES: PartnerSchoolLicense[] = [
-  {
-    id: 'lic-1',
-    schoolName: 'Escola de Natação & Fitness Aquafit',
-    contactName: 'Prof. Carlos Alberto Mello',
-    email: 'diretoria@aquafit.com.br',
-    phone: '(11) 98765-4321',
-    loginUsername: 'aquafit@vbsport.com.br',
-    planName: 'Licença Gestão Completa (Até 500 alunos)',
-    planPrice: 299.00,
-    expirationDate: '2026-10-25', // Vence em breve
-    isWarningBannerActive: true,
-    customWarningMessage: 'Evite a suspensão do acesso à catraca e app do aluno.',
-    status: 'vencendo',
-    pixKey: 'marinho.gianluca@gmail.com',
-    notes: 'Escola parceira terceirizada no Morumbi. Contrato anual.',
-    createdAt: '2025-10-25'
-  },
-  {
-    id: 'lic-2',
-    schoolName: 'Centro de Treinamento & Lutas Bushido',
-    contactName: 'Mestre Fernando Tanaka',
-    email: 'bushidofight@gmail.com',
-    phone: '(11) 97654-3210',
-    loginUsername: 'bushido@vbsport.com.br',
-    planName: 'Licença Standard (Até 250 alunos)',
-    planPrice: 199.00,
-    expirationDate: '2026-11-30',
-    isWarningBannerActive: false,
-    customWarningMessage: 'Renovação do sistema de gestão esportiva.',
-    status: 'ativa',
-    pixKey: 'marinho.gianluca@gmail.com',
-    notes: 'Parceiro com 140 alunos ativos.',
-    createdAt: '2025-11-30'
-  },
-  {
-    id: 'lic-3',
-    schoolName: 'Studio Pilates & Funcional Harmonia',
-    contactName: 'Dra. Patrícia Vasconcelos',
-    email: 'patricia@harmoniapilates.com',
-    phone: '(11) 99888-7766',
-    loginUsername: 'harmonia@vbsport.com.br',
-    planName: 'Licença Premium Anual',
-    planPrice: 249.00,
-    expirationDate: '2026-12-15',
-    isWarningBannerActive: false,
-    status: 'ativa',
-    pixKey: 'marinho.gianluca@gmail.com',
-    notes: 'Studio de pilates e reabilitação.',
-    createdAt: '2025-12-15'
-  }
-];
+export const INITIAL_PARTNER_LICENSES: PartnerSchoolLicense[] = [];
 
 /**
  * Verifica se o usuário atual é o Administrador Master / Proprietário do Sistema (Gianluca Marinho)
@@ -212,7 +161,7 @@ export const buildRenewalWhatsAppUrl = (license: PartnerSchoolLicense, adminName
     `• *Plano:* ${license.planName}%0A` +
     `• *Valor da Renovação:* R$ ${license.planPrice.toFixed(2).replace('.', ',')}%0A` +
     `• *Chave PIX:* ${license.pixKey || 'marinho.gianluca@gmail.com'}%0A%0A` +
-    `Para garantir a continuidade dos acessos na catraca, app do aluno e financeiro sem interrupções, por favor envie o comprovante por aqui.%0A%0A` +
+    `Para garantir a continuidade dos acessos ao sistema, app do aluno e financeiro sem interrupções, por favor envie o comprovante por aqui.%0A%0A` +
     `Atenciosamente,%0A*${adminName}* • GL PRO FIT Enterprise`;
 
   const cleanPhone = license.phone.replace(/\D/g, '');

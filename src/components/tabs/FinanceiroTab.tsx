@@ -135,31 +135,9 @@ export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <CircleDollarSign className="h-5 w-5 text-blue-600" />
-            Gestão Financeira & GL Profit Pay
-          </h1>
-          <p className="text-sm text-slate-500">
-            Fluxo de caixa, recebimentos, contas a pagar, DRE e gateway recorrente GL Profit Pay
-          </p>
-        </div>
-
-        {activeSubTab !== 'gl_profit_pay' && (
-          <button
-            onClick={() => setShowNewTxModal(true)}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition-colors shadow-xs"
-          >
-            <Plus className="h-4 w-4" />
-            Nova Movimentação
-          </button>
-        )}
-      </div>
-
       {/* Subtab Selector */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
+      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 border-b border-slate-200">
+        <div className="flex items-center gap-2">
         {subTabButtons.map((sub) => {
           const SubIcon = sub.icon;
           const isActive = activeSubTab === sub.id;
@@ -185,6 +163,17 @@ export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
             </button>
           );
         })}
+        </div>
+
+        {activeSubTab !== 'gl_profit_pay' && (
+          <button
+            onClick={() => setShowNewTxModal(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs shrink-0 cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Nova Movimentação</span>
+          </button>
+        )}
       </div>
 
       {activeSubTab === 'gl_profit_pay' ? (

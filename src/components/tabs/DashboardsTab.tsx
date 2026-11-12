@@ -13,10 +13,9 @@ import {
   TrendingUp,
   Sparkles
 } from 'lucide-react';
-import { Student, AccessLog, FinancialTransaction, Lead, ClassSession, WorkoutPlan } from '../../types';
+import { Student, FinancialTransaction, Lead, ClassSession, WorkoutPlan } from '../../types';
 import { CrmDashboard } from './dashboards/CrmDashboard';
 import { GerencialDashboard } from './dashboards/GerencialDashboard';
-import { OperacionalDashboard } from './dashboards/OperacionalDashboard';
 import { ClientesDashboard } from './dashboards/ClientesDashboard';
 import { FinanceiroDashboard } from './dashboards/FinanceiroDashboard';
 import { AgendaDashboard } from './dashboards/AgendaDashboard';
@@ -27,7 +26,6 @@ import { DashboardAiReportCard } from './dashboards/DashboardAiReportCard';
 export type DashboardSubTab = 
   | 'crm' 
   | 'gerencial' 
-  | 'operacional' 
   | 'clientes' 
   | 'financeiro' 
   | 'agenda' 
@@ -36,7 +34,6 @@ export type DashboardSubTab =
 
 interface DashboardsTabProps {
   students: Student[];
-  accessLogs: AccessLog[];
   transactions: FinancialTransaction[];
   leads?: Lead[];
   classes?: ClassSession[];
@@ -48,7 +45,6 @@ interface DashboardsTabProps {
 
 export const DashboardsTab: React.FC<DashboardsTabProps> = ({
   students,
-  accessLogs,
   transactions,
   leads = [],
   classes = [],
@@ -78,7 +74,6 @@ export const DashboardsTab: React.FC<DashboardsTabProps> = ({
   const tabsConfig = [
     { id: 'crm' as DashboardSubTab, label: 'CRM', icon: Share2, badge: 'Funil' },
     { id: 'gerencial' as DashboardSubTab, label: 'Gerencial', icon: Briefcase, badge: 'DRE' },
-    { id: 'operacional' as DashboardSubTab, label: 'Operacional', icon: Activity, badge: 'Catraca' },
     { id: 'clientes' as DashboardSubTab, label: 'Clientes', icon: Users, badge: 'Retenção' },
     { id: 'financeiro' as DashboardSubTab, label: 'Financeiro', icon: CircleDollarSign, badge: 'Caixa' },
     { id: 'agenda' as DashboardSubTab, label: 'Agenda', icon: Calendar, badge: 'Aulas' },
@@ -124,13 +119,8 @@ export const DashboardsTab: React.FC<DashboardsTabProps> = ({
 
         {currentSubTab === 'gerencial' && (
           <GerencialDashboard 
-            onNavigateToTab={onNavigateToTab} 
-          />
-        )}
-
-        {currentSubTab === 'operacional' && (
-          <OperacionalDashboard 
-            accessLogs={accessLogs} 
+            students={students}
+            transactions={transactions}
             onNavigateToTab={onNavigateToTab} 
           />
         )}
@@ -151,18 +141,23 @@ export const DashboardsTab: React.FC<DashboardsTabProps> = ({
 
         {currentSubTab === 'agenda' && (
           <AgendaDashboard 
+            classes={classes}
             onNavigateToTab={onNavigateToTab} 
           />
         )}
 
         {currentSubTab === 'treino' && (
           <TreinoDashboard 
+            workouts={workouts}
+            students={students}
             onNavigateToTab={onNavigateToTab} 
           />
         )}
 
         {currentSubTab === 'whatsapp' && (
           <WhatsappDashboard 
+            leads={leads}
+            students={students}
             onNavigateToTab={onNavigateToTab} 
           />
         )}
@@ -171,7 +166,6 @@ export const DashboardsTab: React.FC<DashboardsTabProps> = ({
         <DashboardAiReportCard
           subTab={currentSubTab}
           students={students}
-          accessLogs={accessLogs}
           transactions={transactions}
           leads={leads}
           classes={classes}

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { 
   Users, 
+  User,
   Search, 
   Plus, 
   Filter, 
   MessageSquare, 
   FileText, 
-  UserCheck, 
   AlertCircle, 
   CheckCircle2, 
   Clock, 
@@ -18,22 +18,65 @@ import {
 } from 'lucide-react';
 import { Student, StudentStatus } from '../../types';
 import { formatCurrency, formatDate, sendWhatsAppMessage } from '../../utils';
+import { FinancialTransaction, WorkoutPlan, WellnessCheckin, PhysicalAssessmentData } from '../../types';
+import { FichaCompletaAlunoView } from './alunos/FichaCompletaAlunoView';
 
 interface AlunosTabProps {
   students: Student[];
   onOpenNewStudent: () => void;
-  onSelectStudent: (student: Student) => void;
-  onTestTurnstile: (student: Student) => void;
+  onSelectStudent?: (student: Student) => void;
+  transactions?: FinancialTransaction[];
+  workouts?: WorkoutPlan[];
+  checkins?: WellnessCheckin[];
+  assessments?: PhysicalAssessmentData[];
+  onUpdateStudentStatus?: (studentId: string, status: StudentStatus) => void;
+  onSettleStudentPayment?: (studentId: string) => void;
+  onNavigateToTab?: (tab: string) => void;
+  initialSelectedStudent?: Student | null;
+  onUpdateStudent?: (student: Student) => void;
+  onAddSaleTransaction?: (transaction: FinancialTransaction, updatedStudent?: Student) => void;
 }
 
 export const AlunosTab: React.FC<AlunosTabProps> = ({
   students,
   onOpenNewStudent,
   onSelectStudent,
-  onTestTurnstile
+  transactions = [],
+  workouts = [],
+  checkins,
+  assessments,
+  onUpdateStudentStatus,
+  onSettleStudentPayment,
+  onNavigateToTab,
+  initialSelectedStudent,
+  onUpdateStudent,
+  onAddSaleTransaction
 }) => {
+  const [selectedStudentForFullView, setSelectedStudentForFullView] = useState<Student | null>(initialSelectedStudent || null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
+
+  // Se houver um aluno selecionado para visualização completa, exibe a Nova Tela Central
+  if (selectedStudentForFullView) {
+    const currentStudent = students.find(s => s.id === selectedStudentForFullView.id) || selectedStudentForFullView;
+    return (
+      <FichaCompletaAlunoView
+        student={currentStudent}
+        onBack={() => {
+          setSelectedStudentForFullView(null);
+        }}
+        transactions={transactions}
+        workouts={workouts}
+        checkins={checkins}
+        assessments={assessments}
+        onUpdateStudentStatus={onUpdateStudentStatus || (() => {})}
+        onSettleStudentPayment={onSettleStudentPayment || (() => {})}
+        onNavigateToTab={onNavigateToTab}
+        onUpdateStudent={onUpdateStudent}
+        onAddSaleTransaction={onAddSaleTransaction}
+      />
+    );
+  }
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = 
@@ -181,15 +224,29 @@ export const AlunosTab: React.FC<AlunosTabProps> = ({
                     {/* Student Info */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={student.photo}
-                          alt={student.name}
-                          className="h-9 w-9 rounded-full object-cover border border-slate-200 shadow-xs"
-                        />
+                        {student.photo ? (
+                          <img
+                            src={student.photo}
+                            alt={student.name}
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                              const sibling = (e.target as HTMLElement).nextElementSibling;
+                              if (sibling) (sibling as HTMLElement).style.display = 'flex';
+                            }}
+                            className="h-9 w-9 rounded-full object-cover border border-slate-200 shadow-xs"
+                          />
+                        ) : null}
+                        <div className={`h-9 w-9 rounded-full bg-slate-800 text-slate-200 border border-slate-300 flex items-center justify-center shrink-0 ${student.photo ? 'hidden' : 'flex'}`}>
+                          <User className="h-4 w-4" />
+                        </div>
                         <div>
                           <div 
-                            onClick={() => onSelectStudent(student)}
+                            onClick={() => {
+                              setSelectedStudentForFullView(student);
+                              onSelectStudent?.(student);
+                            }}
                             className="font-semibold text-slate-900 hover:text-blue-600 cursor-pointer"
+                            title="Abrir Ficha Completa 360°"
                           >
                             {student.name}
                           </div>
@@ -258,20 +315,18 @@ export const AlunosTab: React.FC<AlunosTabProps> = ({
                           <MessageSquare className="h-4 w-4" />
                         </button>
 
-                        <button
-                          onClick={() => onTestTurnstile(student)}
-                          className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-blue-600 transition-colors"
-                          title="Testar Passagem na Catraca"
-                        >
-                          <UserCheck className="h-4 w-4" />
-                        </button>
+
 
                         <button
-                          onClick={() => onSelectStudent(student)}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+                          onClick={() => {
+                            setSelectedStudentForFullView(student);
+                            onSelectStudent?.(student);
+                          }}
+                          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-all shadow-xs cursor-pointer active:scale-95"
+                          title="Abrir Tela Central da Ficha do Aluno"
                         >
-                          <FileText className="h-3.5 w-3.5 text-slate-400" />
-                          Ficha
+                          <FileText className="h-3.5 w-3.5 text-blue-600" />
+                          <span>Ficha</span>
                         </button>
                       </div>
                     </td>

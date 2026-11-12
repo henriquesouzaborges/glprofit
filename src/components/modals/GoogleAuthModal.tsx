@@ -243,8 +243,8 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className={`w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] rounded-2xl p-4 sm:p-6 md:p-7 shadow-2xl relative border my-auto flex flex-col transition-all ${
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+      <div className={`w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] rounded-2xl p-4 sm:p-6 md:p-7 shadow-2xl relative border flex flex-col transition-all ${
         isDarkMode 
           ? 'bg-[#15151a] border-[#2d2d38] text-white shadow-black/80' 
           : 'bg-white border-slate-200 text-slate-900 shadow-xl'

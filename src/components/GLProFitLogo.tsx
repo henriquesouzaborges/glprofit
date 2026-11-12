@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import logoOficial from '../assets/images/gl-pro-fit-logo-oficial.png';
 
 interface GLProFitLogoProps {
   className?: string;
   theme?: 'dark' | 'light';
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showSubtitle?: boolean;
-  variant?: 'vector' | 'image';
+  variant?: 'official' | 'vector' | 'image';
 }
 
 export const GLProFitLogo: React.FC<GLProFitLogoProps> = ({
@@ -13,7 +14,7 @@ export const GLProFitLogo: React.FC<GLProFitLogoProps> = ({
   theme = 'dark',
   size = 'md',
   showSubtitle = true,
-  variant = 'vector'
+  variant = 'official'
 }) => {
   const [imageError, setImageError] = useState(false);
 
@@ -31,6 +32,19 @@ export const GLProFitLogo: React.FC<GLProFitLogoProps> = ({
   const subtextColor = theme === 'dark' ? '#94A3B8' : '#334155';
   const ringColor = '#2563EB';
   const darkArcColor = theme === 'dark' ? '#E2E8F0' : '#0F172A';
+
+  // Logomarca oficial (PNG com fundo transparente, sem recompressão)
+  if (variant === 'official') {
+    return (
+      <img
+        src={logoOficial}
+        alt="GL PRO FIT — Performance • Análise • Controle"
+        draggable={false}
+        className={`block h-auto select-none ${className}`}
+        style={{ width: '100%', maxWidth: dimensions.width * 1.05 }}
+      />
+    );
+  }
 
   // If image variant requested and available
   if (variant === 'image' && !imageError) {

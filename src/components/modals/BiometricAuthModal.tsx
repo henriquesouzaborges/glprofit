@@ -169,7 +169,7 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 overflow-y-auto bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
       <div className={`w-full max-w-md rounded-2xl p-6 shadow-2xl relative border transition-all ${
         isDarkMode 
           ? 'bg-[#15151a] border-[#2c2c36] text-white' 

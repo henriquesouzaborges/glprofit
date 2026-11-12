@@ -250,16 +250,15 @@ export const MigracoesConfigView: React.FC<MigracoesConfigViewProps> = ({
             studentId: item.matchedStudentId || students[0]?.id || 'std-1',
             studentName: item.matchedStudentName || item.studentName || students[0]?.name || 'Aluno',
             instructor: item.instructor || currentUser?.name || 'Professor',
-            goal: item.goal || 'Hipertrofia',
+            objective: item.goal || 'Hipertrofia',
             level: (item.level as any) || 'Intermediário',
             frequency: item.frequency || 'ABC (3x por semana)',
             startDate: new Date().toISOString().slice(0, 10),
             validUntil: item.validUntil || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-            active: true,
-            divisions: (item.divisions || []).map((div: any) => ({
-              letter: div.letter || 'A',
-              name: div.name || 'Treino A',
-              targetMuscles: div.targetMuscles || ['Geral'],
+            splits: (item.divisions || []).map((div: any) => ({
+              id: `split-${Math.random()}`,
+              name: div.name || div.letter || 'Treino A',
+              dayOfWeek: div.dayOfWeek || 'Segunda-feira',
               exercises: (div.exercises || []).map((ex: any, exIdx: number) => ({
                 id: `ex-mig-${Date.now()}-${exIdx}`,
                 name: ex.name || 'Exercício',

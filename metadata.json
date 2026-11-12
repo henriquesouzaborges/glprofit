@@ -1,6 +1,9 @@
 {
-  "name": "VB SPORT ADM",
-  "description": "Sistema de Gestão Fitness e Academia - VB SPORT ADM",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "GL PRO FIT - Sistema de Gestão para Academias e Centros de Treinamento",
+  "description": "Sistema completo de gestão, CRM, financeiro, treinos, avaliações e IA para academias.",
+  "requestor": "user",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
+  "permissions": []
 }

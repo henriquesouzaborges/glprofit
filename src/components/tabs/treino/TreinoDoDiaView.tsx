@@ -510,7 +510,7 @@ export const TreinoDoDiaView: React.FC<TreinoDoDiaViewProps> = ({
                   <Clock className="w-4 h-4 text-blue-600" />
                   Cronômetro de Descanso
                 </span>
-                <Volume2 className="w-4 h-4 text-slate-400" title="Alerta sonoro habilitado" />
+                <Volume2 className="w-4 h-4 text-slate-400" />
               </div>
 
               {/* Circular / Progress visualizer */}

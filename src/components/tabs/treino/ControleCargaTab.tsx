@@ -289,7 +289,7 @@ export const ControleCargaTab: React.FC<ControleCargaTabProps> = ({
 
     // Trigger WhatsApp notification if active
     if (notifyViaWhatsAppOnSubmit && currentWhatsAppConfig?.enabled) {
-      const studentFirstName = currentStudent?.name.split(' ')[0] || 'Aluno';
+      const studentFirstName = currentStudent?.name ? currentStudent.name.split(' ')[0] : 'Aluno';
       const cleanPhone = (currentWhatsAppConfig.phone || currentStudent?.phone || '').replace(/\D/g, '');
       const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
       const msg = `Fala, ${studentFirstName}! 🏋️‍♂️ O Prof. Gianluca Marinho acabou de registrar sua nova carga no *${newLogExercise}*: *${newLogWeight} kg* (${newLogReps} reps) com 1RM estimado em *${est1RM} kg*! 💪 Acesse sua ficha completa: https://app.glprofit.com.br/cargas`;

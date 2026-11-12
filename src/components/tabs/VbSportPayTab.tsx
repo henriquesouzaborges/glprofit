@@ -120,6 +120,9 @@ export const VbSportPayTab: React.FC<VbSportPayTabProps> = ({
             <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
               Gateway Recorrente Oficial
             </span>
+            <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
+              Simulado — ambiente de testes
+            </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Cobrança recorrente sem comprometer o limite do cartão do aluno, PIX dinâmico e links de pagamento
@@ -203,7 +206,7 @@ export const VbSportPayTab: React.FC<VbSportPayTabProps> = ({
             Taxa Zero
           </div>
           <div className="mt-1 flex items-center gap-1 text-[11px] text-teal-700 font-medium">
-            <span>Liberação imediata na catraca</span>
+            <span>Regularização imediata de acesso</span>
           </div>
         </div>
       </div>
@@ -378,10 +381,10 @@ export const VbSportPayTab: React.FC<VbSportPayTabProps> = ({
             <QrCode className="h-6 w-6 text-teal-600" />
             <div>
               <h2 className="text-sm font-semibold text-slate-900">
-                Chave PIX e Integração Automática com Catraca
+                Chave PIX e Conciliação Instantânea
               </h2>
               <p className="text-xs text-slate-500">
-                Quando o aluno paga pelo QR Code gerado pelo GL Profit Pay, a catraca libera em menos de 3 segundos.
+                Quando o aluno paga pelo QR Code gerado pelo GL Profit Pay, a regularização do plano ocorre em menos de 3 segundos.
               </p>
             </div>
           </div>

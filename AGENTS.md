@@ -6,3 +6,7 @@
   - `src/version.ts`: Atualizar `SYSTEM_VERSION_INFO.version` (ex: `v1.4.1` -> `v1.4.2`), `buildNumber`, `releaseDate` e adicionar o novo item no array `changelog` detalhando o que foi feito.
   - `package.json`: Manter o campo `"version"` sincronizado (ex: `"1.4.2"`).
 - O rodapé (`src/components/Footer.tsx`) e a barra lateral consomem automaticamente essa configuração para exibir a versão ativa do sistema.
+
+## Registro de Alterações em Artefatos (.md)
+- **Regra Obrigatória:** A cada alteração realizada no sistema, deve ser criado um documento `.md` dentro do diretório de artefatos (`/.aistudio/artifacts/brain/f4a72c22-1567-475f-a82d-18ccf669ad1b/`) contendo o registro técnico e detalhado das mudanças realizadas, arquivos afetados e validações, assegurando o controle histórico completo para o administrador.
+

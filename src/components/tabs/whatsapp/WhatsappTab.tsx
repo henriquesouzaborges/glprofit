@@ -510,7 +510,7 @@ export const WhatsappTab: React.FC<WhatsappTabProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <span className="flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 font-semibold">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-            Pré-configurado (Fase 2)
+            Simulado — ambiente de testes
           </span>
         </div>
       </div>

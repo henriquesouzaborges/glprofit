@@ -116,12 +116,12 @@ export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 overflow-y-auto bg-slate-900/60 backdrop-blur-xs"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden mb-8 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-3">
@@ -296,7 +296,7 @@ export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
                 <div>
                   <p className="font-bold">Perfil de Administrador Ativo</p>
                   <p className="text-blue-700 text-[11px] mt-0.5">
-                    Como Administrador, este usuário possui permissão total e irrestrita a todos os módulos, catracas, relatórios financeiros e configurações do sistema.
+                    Como Administrador, este usuário possui permissão total e irrestrita a todos os módulos, relatórios financeiros e configurações do sistema.
                   </p>
                 </div>
               </div>

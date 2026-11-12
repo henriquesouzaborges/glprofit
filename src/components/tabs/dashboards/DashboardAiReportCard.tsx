@@ -21,7 +21,7 @@ import {
   Zap,
   Info
 } from 'lucide-react';
-import { Student, AccessLog, FinancialTransaction, Lead, ClassSession, WorkoutPlan } from '../../../types';
+import { Student, FinancialTransaction, Lead, ClassSession, WorkoutPlan } from '../../../types';
 import { 
   DashboardAiReport, 
   SubTabGoalsConfig, 
@@ -36,7 +36,6 @@ import {
 interface DashboardAiReportCardProps {
   subTab: string;
   students: Student[];
-  accessLogs: AccessLog[];
   transactions: FinancialTransaction[];
   leads?: Lead[];
   classes?: ClassSession[];
@@ -47,7 +46,6 @@ interface DashboardAiReportCardProps {
 export const DashboardAiReportCard: React.FC<DashboardAiReportCardProps> = ({
   subTab,
   students,
-  accessLogs,
   transactions,
   leads = [],
   classes = [],
@@ -79,13 +77,12 @@ export const DashboardAiReportCard: React.FC<DashboardAiReportCardProps> = ({
   const liveMetrics = useMemo(() => {
     return extractSubTabLiveMetrics(subTab, {
       students,
-      accessLogs,
       transactions,
       leads,
       classes,
       workouts
     });
-  }, [subTab, students, accessLogs, transactions, leads, classes, workouts]);
+  }, [subTab, students, transactions, leads, classes, workouts]);
 
   // Load / Generate AI Report
   const handleGenerateReport = useCallback(async (customConfig?: SubTabGoalsConfig) => {

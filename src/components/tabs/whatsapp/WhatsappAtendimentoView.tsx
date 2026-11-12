@@ -556,13 +556,13 @@ export const WhatsappAtendimentoView: React.FC<WhatsappAtendimentoViewProps> = (
                   <div className="text-sm font-black text-rose-700">
                     {formatCurrency(selectedChat.pendingAmount)}
                   </div>
-                  <div className="text-[11px] text-rose-700">Catraca bloqueada até regularização</div>
+                  <div className="text-[11px] text-rose-700">Acesso pendente de regularização</div>
                 </div>
               ) : (
                 <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 space-y-1 text-emerald-900">
                   <div className="text-[10px] font-bold uppercase text-emerald-600">Situação Financeira</div>
                   <div className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                    <CheckCheck className="h-3.5 w-3.5" /> Mensalidades em dia / Catraca Liberada
+                    <CheckCheck className="h-3.5 w-3.5" /> Mensalidades em dia / Acesso Liberado
                   </div>
                 </div>
               )}

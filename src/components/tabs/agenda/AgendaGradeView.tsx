@@ -13,7 +13,6 @@ import {
   ThumbsUp,
   ThumbsDown,
   Sparkles,
-  Radio,
   SlidersHorizontal,
   RotateCcw,
   Check,
@@ -53,7 +52,7 @@ export const AgendaGradeView: React.FC<AgendaGradeViewProps> = ({
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [enrollStudentId, setEnrollStudentId] = useState('');
 
-  // Agenda Settings from tabSettingsService (modoChamada, presencaAutomaticaCatraca, etc.)
+  // Agenda Settings from tabSettingsService (modoChamada, etc.)
   const [settings, setSettings] = useState<AgendaSettingsConfig>(() => getAgendaSettings());
 
   // Listen or refresh settings
@@ -174,17 +173,10 @@ export const AgendaGradeView: React.FC<AgendaGradeViewProps> = ({
   };
 
   const handleToggleModoChamada = () => {
-    const nextMode = settings.modoChamada === 'dedao' ? 'tradicional' : 'dedao';
+    const nextMode: 'dedao' | 'tradicional' = settings.modoChamada === 'dedao' ? 'tradicional' : 'dedao';
     const updated = { ...settings, modoChamada: nextMode };
     setSettings(updated);
     updateAgendaSettings({ modoChamada: nextMode });
-  };
-
-  const handleToggleCatracaPresenca = () => {
-    const nextVal = !settings.presencaAutomaticaCatraca;
-    const updated = { ...settings, presencaAutomaticaCatraca: nextVal };
-    setSettings(updated);
-    updateAgendaSettings({ presencaAutomaticaCatraca: nextVal });
   };
 
   const handleCreateClass = (e: React.FormEvent) => {
@@ -407,26 +399,6 @@ export const AgendaGradeView: React.FC<AgendaGradeViewProps> = ({
                     )}
                   </div>
                 </div>
-
-                {/* Catraca Auto Presence Status Banner */}
-                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
-                  <span className="flex items-center gap-1.5 text-slate-600">
-                    <Radio className={`w-3 h-3 ${settings.presencaAutomaticaCatraca ? 'text-emerald-600 animate-pulse' : 'text-slate-400'}`} />
-                    <span>Presença Automática via Catraca:</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleToggleCatracaPresenca}
-                    className={`font-bold px-2 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${
-                      settings.presencaAutomaticaCatraca 
-                        ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' 
-                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                    }`}
-                    title="Alternar presença automática via catraca"
-                  >
-                    {settings.presencaAutomaticaCatraca ? 'ATIVA (Auto)' : 'DESATIVADA'}
-                  </button>
-                </div>
               </div>
 
               {/* Attendance Statistics Counter */}
@@ -506,22 +478,9 @@ export const AgendaGradeView: React.FC<AgendaGradeViewProps> = ({
                             
                             <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                               {isPresente ? (
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                                  enrolled.checkInSource === 'catraca'
-                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                    : 'bg-emerald-100/70 text-emerald-700'
-                                }`}>
-                                  {enrolled.checkInSource === 'catraca' ? (
-                                    <>
-                                      <Radio className="w-2.5 h-2.5 animate-pulse text-emerald-600" />
-                                      <span>Catraca ({enrolled.checkInTime || 'Hoje'})</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                      <span>Presente ({enrolled.checkInTime || 'Professor'})</span>
-                                    </>
-                                  )}
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-emerald-100/70 text-emerald-700">
+                                  <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                  <span>Presente ({enrolled.checkInTime || 'Professor'})</span>
                                 </span>
                               ) : isFalta ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-rose-100 text-rose-800 border border-rose-200">

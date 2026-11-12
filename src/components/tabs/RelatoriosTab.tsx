@@ -15,19 +15,17 @@ import {
   Filter,
   BarChart2
 } from 'lucide-react';
-import { Student, FinancialTransaction, AccessLog } from '../../types';
+import { Student, FinancialTransaction } from '../../types';
 import { formatCurrency, sendWhatsAppMessage } from '../../utils';
 
 interface RelatoriosTabProps {
   students: Student[];
   transactions: FinancialTransaction[];
-  accessLogs: AccessLog[];
 }
 
 export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
   students,
-  transactions,
-  accessLogs
+  transactions
 }) => {
   const [reportType, setReportType] = useState<'financeiro' | 'inadimplencia' | 'frequencia' | 'vendas' | 'churn'>('financeiro');
   const [period, setPeriod] = useState<'atual' | 'trimestre' | 'ano'>('atual');
@@ -38,8 +36,8 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
   // Inactive students (no access in last 15 days or never)
   const absentStudents = students.filter(s => s.status === 'ativo' && (!s.lastAccess || s.lastAccess.includes('2023') || s.lastAccess.includes('15 dias')));
 
-  const totalRevenue = transactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + t.amount, 0) + 48200;
-  const totalExpenses = transactions.filter(t => t.type === 'despesa').reduce((acc, t) => acc + t.amount, 0) + 16400;
+  const totalRevenue = transactions.filter(t => t.type === 'receita' && t.status === 'pago').reduce((acc, t) => acc + t.amount, 0);
+  const totalExpenses = transactions.filter(t => t.type === 'despesa' && t.status === 'pago').reduce((acc, t) => acc + t.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
 
   const handleExportCSV = () => {
@@ -226,7 +224,7 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
                   <th className="px-4 py-3">Plano</th>
                   <th className="px-4 py-3">Vencimento</th>
                   <th className="px-4 py-3">Valor Devido</th>
-                  <th className="px-4 py-3">Acesso Catraca</th>
+                  <th className="px-4 py-3">Status de Acesso</th>
                   <th className="px-4 py-3 text-right">Ação</th>
                 </tr>
               </thead>
@@ -277,7 +275,7 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
               Alunos Ausentes da Academia (Alerta de Evasão / Churn Prevention)
             </h2>
             <p className="text-xs text-slate-500">
-              Alunos matriculados que não passam na catraca há mais de 10 dias têm 4x mais chances de cancelar.
+              Alunos matriculados que não realizam check-in há mais de 10 dias têm 4x mais chances de cancelar.
             </p>
           </div>
 

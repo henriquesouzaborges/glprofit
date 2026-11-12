@@ -48,8 +48,7 @@ import { TestesFuncionaisView } from './avaliacoes/TestesFuncionaisView';
 import { TestesForcaView } from './avaliacoes/TestesForcaView';
 import { TestesSaltoView } from './avaliacoes/TestesSaltoView';
 import { TestesCampoView } from './avaliacoes/TestesCampoView';
-import { TestesPersonalizadosView } from './avaliacoes/TestesPersonalizadosView';
-import { AvaliacoesHubView } from './avaliacoes/AvaliacoesHubView';
+import { AvaliacoesHubView, DEFAULT_STUDENT_FALLBACK } from './avaliacoes/AvaliacoesHubView';
 import { AvaliacoesConfiguracoesHubView } from './avaliacoes/AvaliacoesConfiguracoesHubView';
 
 export const ACTIVE_AVALIACOES_SUBTABS: AvaliacoesSubTab[] = [
@@ -423,7 +422,7 @@ export const AvaliacoesFisicasTab: React.FC<AvaliacoesFisicasTabProps> = ({
       {currentSubTab === 'avaliacoes' && (
         <AvaliacoesHubView
           students={students}
-          student={currentStudent || students[0]}
+          student={currentStudent || students[0] || DEFAULT_STUDENT_FALLBACK}
           onSelectStudentId={(id) => {
             setInternalStudentId(id);
             if (onSelectStudentId) onSelectStudentId(id);
@@ -434,7 +433,7 @@ export const AvaliacoesFisicasTab: React.FC<AvaliacoesFisicasTabProps> = ({
 
       {/* RENDERIZAÇÃO DA SUB-ABA CONFIGURAÇÕES (CENTRAL COM OS 10 MÓDULOS) */}
       {currentSubTab === 'configuracoes' && (
-        <AvaliacoesConfiguracoesHubView student={currentStudent || students[0]} />
+        <AvaliacoesConfiguracoesHubView student={currentStudent || students[0] || DEFAULT_STUDENT_FALLBACK} />
       )}
 
       {/* SUPORTE CASO ACESSE DIRETAMENTE PELO IDENTIFICADOR DE UMA DAS 10 AVALIAÇÕES */}
@@ -691,9 +690,9 @@ export const AvaliacoesFisicasTab: React.FC<AvaliacoesFisicasTabProps> = ({
         <TreinoPdfReportModal
           isOpen={showPdfModal}
           onClose={() => setShowPdfModal(false)}
+          subTab="prescricao"
+          student={students.find(s => s.id === activeStudentId) || students[0]}
           workouts={[]}
-          students={students}
-          selectedStudentId={activeStudentId}
         />
       )}
     </div>

@@ -25,6 +25,7 @@ export const NovoAlunoModal: React.FC<NovoAlunoModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
   const [paymentNow, setPaymentNow] = useState(true);
   const [notes, setNotes] = useState('');
+  const [consentLgpd, setConsentLgpd] = useState(false);
 
   if (!isOpen) return null;
 
@@ -60,7 +61,10 @@ export const NovoAlunoModal: React.FC<NovoAlunoModalProps> = ({
       endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       pendingAmount: 0,
-      notes
+      notes,
+      consentLgpd: true,
+      consentLgpdDate: new Date().toISOString(),
+      consentLgpdVersion: '2026-11'
     };
 
     let firstTx: FinancialTransaction | undefined = undefined;
@@ -84,7 +88,7 @@ export const NovoAlunoModal: React.FC<NovoAlunoModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 overflow-y-auto bg-slate-900/60 backdrop-blur-xs">
       <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
@@ -245,6 +249,21 @@ export const NovoAlunoModal: React.FC<NovoAlunoModalProps> = ({
             />
           </div>
 
+          {/* Checkbox de Consentimento LGPD */}
+          <div className="pt-1">
+            <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-colors cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={consentLgpd}
+                onChange={(e) => setConsentLgpd(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span className="text-xs text-slate-700 leading-relaxed">
+                Declaro que o aluno autoriza o tratamento de seus dados pessoais e de saúde pela academia, conforme a LGPD (Lei nº 13.709/2018), para fins de matrícula e prescrição de treinos.
+              </span>
+            </label>
+          </div>
+
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
             <button
               type="button"
@@ -255,7 +274,12 @@ export const NovoAlunoModal: React.FC<NovoAlunoModalProps> = ({
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-blue-600 px-5 py-2 text-xs font-medium text-white hover:bg-blue-700 shadow-xs transition-colors"
+              disabled={!consentLgpd}
+              className={`rounded-lg px-5 py-2 text-xs font-bold transition-all shadow-xs ${
+                !consentLgpd 
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' 
+                  : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer active:scale-95'
+              }`}
             >
               Concluir Matrícula
             </button>

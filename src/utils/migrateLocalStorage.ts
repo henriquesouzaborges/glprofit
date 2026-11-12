@@ -8,7 +8,6 @@ import { MigrationState } from '../types/database';
 import { 
   INITIAL_STUDENTS, 
   INITIAL_WORKOUTS, 
-  INITIAL_ACCESS_LOGS, 
   INITIAL_TRANSACTIONS, 
   INITIAL_PRODUCTS 
 } from '../mockData';
@@ -54,7 +53,6 @@ export async function migrateLocalStorageToCloud(forceReRun = false): Promise<Mi
   const students = getStoredArray('vbsport_students', INITIAL_STUDENTS);
   const workouts = getStoredArray('vbsport_workouts', INITIAL_WORKOUTS);
   const chats = getStoredArray('vbsport_whatsapp_chats', INITIAL_WHATSAPP_CHATS);
-  const accessLogs = getStoredArray('vbsport_access_logs', INITIAL_ACCESS_LOGS);
   const transactions = getStoredArray('vbsport_financial_transactions', INITIAL_TRANSACTIONS);
   const products = getStoredArray('vbsport_products', INITIAL_PRODUCTS);
 
@@ -66,7 +64,6 @@ export async function migrateLocalStorageToCloud(forceReRun = false): Promise<Mi
     workouts: workouts.length,
     chats: chats.length,
     messages: messagesCount,
-    accessLogs: accessLogs.length,
     transactions: transactions.length,
     products: products.length
   };

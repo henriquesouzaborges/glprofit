@@ -15,12 +15,214 @@ export interface SystemVersionInfo {
 }
 
 export const SYSTEM_VERSION_INFO: SystemVersionInfo = {
-  version: 'v2.4.23',
+  version: 'v2.5.3',
   versionName: 'GL PRO FIT Enterprise Suite',
-  releaseDate: '22 de Outubro de 2026',
-  buildNumber: '20261022.1',
+  releaseDate: '12 de Novembro de 2026',
+  buildNumber: '20261112.01',
   status: 'stable',
   changelog: [
+    {
+      version: 'v2.5.3',
+      date: '12/11/2026',
+      description: 'Sanitização geral de resíduos e dados fictícios em CRM, automações, pesquisas, agendamentos, DRE, Pay, avaliações, lanchonete, relatórios e dashboards, com criação de botão minimalista de edição no catálogo de exercícios e bloqueio de alucinação na IA.',
+      highlights: [
+        'Zerar Dados Fictícios Remanescentes: Expurgo de leads no CRM, automações, pesquisas de satisfação e licenças de escolas parceiras simuladas (0 escolas parceiras no painel master)',
+        'Dinâmica de Badges e Métricas: Contador de CRM no TopNav e taxa de renovação no B2B calculados dinamicamente com base nos dados reais cadastrados',
+        'Catálogo de Exercícios: Adicionado botão minimalista de "Editar" em cada item do catálogo biomecânico de treinos',
+        'Abas Avaliações e Lanchonete: Limpeza de alertas de vencimento fake em avaliações e itens mais consumidos dinâmicos na lanchonete',
+        'Relatórios e IA: Remoção de offsets fixos no relatório financeiro e instrução anti-alucinação server-side nos prompts de IA para cenários sem dados',
+        'Limpeza de Interface: Remoção do cabeçalho redundante na tela central da aba Financeiro'
+      ]
+    },
+    {
+      version: 'v2.5.2',
+      date: '11/11/2026',
+      description: 'Expurgo completo de dados fictícios em Empresas Clientes B2B, Folha de Ponto / Professores, Eventos de Jogos, Conexão WhatsApp, Cargas 1RM e Avaliações Físicas para ambiente virgem de produção.',
+      highlights: [
+        'Expurgo B2B Empresas Clientes: Exclusão de empresa cliente simulada e definição de INITIAL_EMPRESAS_CLIENTES = [] mantendo o sistema 100% virgem',
+        'Expurgo Folha de Ponto & Professores: Remoção dos perfis de professores fictícios, turmas, eventos de jogos e registros de aulas da folha de ponto',
+        'Expurgo Conexão WhatsApp: Alteração do status inicial do WhatsApp para desconectado, pronto para vincular a instância real da empresa',
+        'Expurgo Cargas 1RM e Avaliações Físicas: Limpeza de registros de cargas, testes físicos e histórico de avaliações nas fichas de alunos',
+        'Mecanismo de Reset no Navegador (glprofit_clean_slate_v252): Expurgados automaticamente do localStorage dados de empresas, folha, cargas, testes e configurações de sessões anteriores'
+      ]
+    },
+    {
+      version: 'v2.5.1',
+      date: '11/11/2026',
+      description: 'Reset de produção e expurgo completo de dados fakes para inicialização limpa do sistema.',
+      highlights: [
+        'Limpeza Completa de Dados Fictícios: Expurgo de todos os alunos, transações, treinos, turmas, leads, produtos, comandas, fornecedores, pesquisas, histórico do WhatsApp e mensagens fictícias',
+        'Manutenção dos Dados Cadastrais: Preservação dos dados cadastrais originais do GL PRO FIT na aba Configurações e manter apenas a empresa matriz GL PRO FIT no B2B',
+        'Usuário Administrador Único: Gianluca Marinho (marinho.gianluca@gmail.com) mantido como único operador/administrador ativo com remoção da foto fictícia para ambiente de produção',
+        'Purge Automático no Navegador: Mecanismo de reset v2.5.1 no App.tsx para expurgar dados em cache no localStorage de sessões anteriores'
+      ]
+    },
+    {
+      version: 'v2.5.0',
+      date: '11/11/2026',
+      description: 'Atualizações completas de Backend, Segurança, LGPD, Persistência Firestore e Gestão B2B SaaS de Empresas Clientes.',
+      highlights: [
+        'Proteção de Endpoints REST Server-Side: Middleware verifyAuthToken com verificação de token Firebase Auth, controle RBAC por papel, limite de taxa (30 chamadas/hora por UID) e limite de payload (1MB / 10MB para migração)',
+        'Remoção de Dados Fakes e Resposta Graciosa do Gemini AI: Eliminação de relatórios fixos em server.ts e aiDashboardService.ts com resposta 503 quando a cota gratuita do Gemini é excedida',
+        'Segurança de Autenticação Firebase: Integração de signInWithEmailAndPassword no LoginPage, eliminação de senhas em texto plano do modelo SystemUser e do código-fonte, suporte a mustChangePassword e script scripts/create-users.ts',
+        'Saneamento de Regras Firestore (firestore.rules): Enforcement estrito de controle de acesso por papel (userRole), isolamento de dados de saúde/financeiro, proibição da propriedade password em documentos e validação consentLgpd == true',
+        'Persistência em Tempo Real de Empresas Clientes (B2B SaaS): Sincronização direta com a coleção empresas_clientes no Firestore, operações por documento com feedback visual e bloqueio imediato de login/acesso para contratos com status "bloqueado"',
+        'Conformidade LGPD & Direitos do Titular: Endpoints GET /api/lgpd/export/:studentId (JSON) e DELETE /api/lgpd/delete/:studentId (Expurgo), salvaguarda de consentLgpdDate/consentLgpdVersion e aviso visual para alunos pendentes',
+        'Identificadores de Ambiente e Documentação Completa: Badges "Simulado — ambiente de testes" no WhatsApp e GL Profit Pay, criação do Dockerfile, .env.example, manuais BACKUP.md, LGPD.md, INTEGRACOES.md, DEPLOY.md e testes automatizados com Vitest'
+      ]
+    },
+    {
+      version: 'v2.4.37',
+      date: '11/11/2026',
+      description: 'Otimizações de performance com React.lazy/Suspense, saneamento arquitetural e conformidade LGPD.',
+      highlights: [
+        'Code-Splitting com React.lazy: Divisão dinâmica de 18 módulos de abas com Suspense fallback, reduzindo o bundle inicial do applet',
+        'Exclusão Definitiva de Componentes Legados: Remoção do arquivo Sidebar.tsx e limpeza de estados/props desnecessários no App e Header',
+        'Centralização de Tipos: Importação canônica de TabType diretamente de src/types.ts em todo o ecossistema da aplicação',
+        'Conformidade LGPD no Cadastro de Alunos: Termo de consentimento explícito e obrigatório para tratamento de dados pessoais e de saúde com bloqueio de matrícula quando desmarcado',
+        'Segurança no Login: Desativação do preenchimento automático de senha ao selecionar usuários de teste no LoginPage',
+        'Ajuste no Manual do Sistema: Renomeação da coluna "Senha Padrão" para "Senha" com indicação "definida pelo administrador"'
+      ]
+    },
+    {
+      version: 'v2.4.36',
+      date: '11/11/2026',
+      description: 'Criação do Dossiê e Manual Mestre Consolidado do Sistema (DOCUMENTACAO_COMPLETA_SISTEMA_GL_PRO_FIT.md) para transferência íntegra e sem perdas de contexto entre conversas.',
+      highlights: [
+        'Dossiê Mestre 360°: Compilação de todas as funcionalidades, módulos, sub-abas, arquitetura de software, endpoints de backend e integração com Firestore',
+        'Estruturas de Dados e RBAC: Documentação exaustiva de modelos, perfis de acesso, regras de persistência e chaves de configuração',
+        'Controle de Continuidade: Especificação exata do estado atual para continuidade imediata em novas sessões sem perda de histórico'
+      ]
+    },
+    {
+      version: 'v2.4.35',
+      date: '10/11/2026',
+      description: 'Remoção total e definitiva do módulo de Catraca de Acesso (física e virtual), eliminando views, botões, simulação, regras de segurança de catraca e logs de passagem, com preservação estrita da biometria de login do usuário (WebAuthn/Touch ID/Face ID).',
+      highlights: [
+        'Remoção Completa da Catraca: Exclusão dos arquivos CatracaTab.tsx, accessLogService.ts, OperacionalDashboard.tsx, e eliminação de rotas e botões de atalho no TopNav, Header, Sidebar e AlunosTab',
+        'Preservação da Biometria de Login: Autenticação biométrica de operadores e administradores (Touch ID, Face ID, Windows Hello / FIDO2) mantida 100% operacional no LoginPage',
+        'Ajuste nos Dashboards: Eliminação da sub-aba "Operacional" focada em catraca, mantendo as sub-abas CRM, Gerencial, Clientes, Financeiro, Agenda, Treino e WhatsApp',
+        'Ficha do Aluno 360°: Remoção da sub-aba "Presenças & Acessos" e do botão "Testar Catraca", com readequação dos cards do Raio-X Geral',
+        'Tolerância Financeira: Campo preservado nas configurações com descrição direcionada exclusivamente a atraso e inadimplência financeira',
+        'Saneamento de Segurança e Banco: Remoção da coleção access_logs nas regras de segurança firestore.rules (deploy efetuado com sucesso) e no firebase-blueprint.json'
+      ]
+    },
+    {
+      version: 'v2.4.34',
+      date: '10/11/2026',
+      description: 'Implementação da aba "Empresas Clientes" (B2B SaaS) à esquerda de Configurações, com Dashboard de Operação e gestão granular de Licenças e Módulos.',
+      highlights: [
+        'Aba Empresas Clientes: Módulo B2B dedicado para gerenciar contratos, faturamento MRR, status de acesso (Ativo/Bloqueado) e licenças das empresas que utilizam o sistema',
+        'Sub-aba Dashboard B2B: Métricas executivas de MRR total, licenças ativas, taxa de retenção e visão geral dos contratos',
+        'Sub-aba Licenças, Acessos & Módulos: Painel interativo com listagem de empresas, alteração de status em 1 clique, cadastro de novos contratos e seletor granular de módulos (Habilitar/Bloquear funcionalidades por empresa cliente)',
+        'Integração Completa TopNav & Router: Posicionamento estratégico no menu superior (TopNav) com persistência local em tempo real'
+      ]
+    },
+    {
+      version: 'v2.4.33',
+      date: '05/11/2026',
+      description: 'Área central e rodapé ajustados para 100% da largura da tela (removido o limite max-w-7xl e mx-auto).',
+      highlights: [
+        'Layout Full-Width: Conteúdo central e rodapé ocupam 100% da largura útil da tela (w-full min-w-0), proporcionando máximo aproveitamento do espaço em telas grandes',
+        'Responsividade e Expansão: Alinhamento de todos os módulos de dashboards, tabelas e cadastros com a barra superior e o rodapé'
+      ]
+    },
+    {
+      version: 'v2.4.32',
+      date: '05/11/2026',
+      description: 'Remoção da barra lateral e introdução do menu horizontal superior TopNav em pílulas com sub-abas retráteis e cabeçalho claro com logomarca oficial.',
+      highlights: [
+        'Menu Superior TopNav (Opção 3 Clean): Substituição da barra lateral pelo menu superior horizontal com 16 abas em formato pílula, roláveis suavemente',
+        'Sub-abas com Chevron Retrátil: Indicador de seta dentro de cada aba para recolher ou expandir a linha de sub-abas dinamicamente',
+        'Novo Cabeçalho Claro: Fundo branco com logomarca oficial GL PRO FIT e barra de busca estilizada em pílula',
+        'Acesso Rápido à Catraca: Botão "Ao vivo" destacado alinhado à direita no menu superior'
+      ]
+    },
+    {
+      version: 'v2.4.31',
+      date: '05/11/2026',
+      description: 'Implementação da aba "Dados do Cadastro" no perfil do aluno, cards minimizados por padrão com alternância por seta, botão de "Vender" em Financeiro e renomeação de Comandas para Lanchonete da Empresa.',
+      highlights: [
+        'Aba "Dados do Cadastro": Edição completa de informações do aluno (nome, CPF, nascimento, telefone, email, plano, valor, vencimento, situação e notas médicas)',
+        'Foto com Fallback Inteligente de Ícone: Gestão visual de imagem com upload do dispositivo, presets rápidos, URL e substituição por ícone estilizado de avatar caso o aluno não tenha foto',
+        'Cards Minimizados por Padrão: Todos os cards das sub-abas do perfil iniciam compactados com indicador de seta (ChevronDown/ChevronUp) e controles rápidos de Expandir/Recolher Todos',
+        'Botão de Vender no Financeiro: Modal de PDV direto na ficha do aluno para vender Planos, Produtos da Lanchonete e Serviços Especializados com geração instantânea de faturas e liquidação',
+        'Renomeação de Comanda para Lanchonete: Ajuste de nomenclatura em menus, cabeçalhos e configurações para representar o controle da Lanchonete da Empresa',
+        'Registro Histórico em Artefatos: Criação do documento registro_alteracoes_v2.4.31_dados_cadastro_cards_minimizados_vender_lanchonete.md'
+      ]
+    },
+    {
+      version: 'v2.4.30',
+      date: '05/11/2026',
+      description: 'Correção de segurança e compatibilidade de tipos no modelo de treinos (splits) da Ficha Completa do Aluno.',
+      highlights: [
+        'Resolução de Erro de Execução (TypeError slice): Ajustada a propriedade de divisões de treinos em FichaCompletaAlunoView para splits (WorkoutSplit[]) com fallback defensivo seguro',
+        'Prevenção de Falhas em Alunos com Treinos Variados: Mapeamento defensivo para campos opcionais de splits, exercícios e objetivos de treino',
+        'Registro Histórico em Artefatos: Criação do documento registro_alteracoes_v2.4.30_correcao_splits_ficha_aluno.md'
+      ]
+    },
+    {
+      version: 'v2.4.29',
+      date: '05/11/2026',
+      description: 'Nova tela central imersiva da Ficha do Aluno 360° na aba Clientes (substituição de card sobreposto por tela completa integrada com treinos, avaliações, bem-estar, financeiro, presenças e nutrição).',
+      highlights: [
+        'Ficha do Aluno em Tela Central: Ao clicar em "Ficha", o sistema abre uma tela central completa dedicada, eliminando o card sobreposto (modal) e permitindo navegação fluida',
+        'Hub 360° de Informações do Perfil: Consolidação de Treinos prescritos, Avaliações físicas (Pollock e Bioimpedância), Questionários diários de Bem-Estar/Prontidão, Histórico Financeiro e mensalidades, Registros biométricos de Presenças na catraca e Plano Nutricional com cálculo de TMB/GET e refeições',
+        'Navegação Ágil e Ações Imediatas: Botão de retorno à lista de alunos, disparo direto via WhatsApp, simulação de catraca, quitação de mensalidade em 1 clique e alternância rápida de status',
+        'Registro Histórico em Artefatos: Criação do documento registro_alteracoes_v2.4.29_ficha_completa_aluno_tela_central.md'
+      ]
+    },
+    {
+      version: 'v2.4.28',
+      date: '05/11/2026',
+      description: 'Posicionamento superior central em todos os cards sobrepostos (modais, popups e dialogs do sistema).',
+      highlights: [
+        'Posicionamento Superior Central: Cards sobrepostos agora abrem diretamente no topo central da tela visível (items-start justify-center pt-6 sm:pt-10 md:pt-12), sem necessidade de rolar ou buscar no meio da tela',
+        'Regras Globais de Overlay em CSS: Aplicação universal em src/index.css para overlays fixos z-50 e z-60 com scroll suave e margens automáticas neutralizadas',
+        'Atualização dos Componentes de Modais: Padronização de Novo Aluno, Ficha do Aluno, Escolas Parceiras, Usuários, Biometria, Termos e Alertas Críticos de Sobrecarga',
+        'Registro Histórico em Artefatos: Criação do documento registro_alteracoes_v2.4.28_posicionamento_superior_modais.md'
+      ]
+    },
+    {
+      version: 'v2.4.27',
+      date: '05/11/2026',
+      description: 'Implementação da governança de controle histórico com geração de artefatos (.md) a cada ciclo de alteração.',
+      highlights: [
+        'Registro Histórico Contínuo em Artefatos: Criação automática de documento .md no diretório de artefatos para cada alteração no sistema',
+        'Artefato da Versão v2.4.26 Emitido: Documento registro_alteracoes_v2.4.26_redesign_login.md gerado com relatório técnico completo das mudanças visuais, fontes, imagens e componentes',
+        'Governança Atualizada em AGENTS.md: Regra obrigatória consolidada para manter a trilha de auditoria e controle total das alterações para o administrador'
+      ]
+    },
+    {
+      version: 'v2.4.26',
+      date: '05 de Novembro de 2026',
+      description: 'Ajustes na tela de login conforme especificações do arquivo zip.',
+      highlights: [
+        'Card de login totalmente branco e logomarca oficial sem placa de fundo',
+        'Destaques laterais esportivos: Escolas de Futebol, Academia, Personal e qualquer segmento esportivo/fitness',
+        'Foto de fundo esportiva em alta definição com sobreposição e degradê institucional azul/escuro',
+        'Tipografia moderna com fontes Barlow e Barlow Condensed para maior impacto visual'
+      ]
+    },
+    {
+      version: 'v2.4.25',
+      date: '05/11/2026',
+      description: 'Geração do Manual Completo do Sistema (MANUAL_DO_SISTEMA.md) contendo arquitetura, credenciais, governança e guia exaustivo de todos os módulos operacionais.',
+      highlights: [
+        'Documentação Integral do Ecossistema: Criação do arquivo MANUAL_DO_SISTEMA.md na raiz do projeto com o mapeamento das 20 abas e submódulos do sistema',
+        'Detalhamento de Arquitetura e Engenharia: Especificação completa da pilha tecnológica (React 19, TypeScript, Node.js 22, Express, Firebase Firestore e Gemini 3.8 Flash)',
+        'Guia de Credenciais e RBAC: Mapeamento de usuários, níveis de permissão, regras de segurança do Firestore e procedimentos de deploy'
+      ]
+    },
+    {
+      version: 'v2.4.24',
+      date: '05/11/2026',
+      description: 'Correção de compatibilidade com Node.js 22 no runtime do Cloud Run: isolamento de tipos Request e Response via type-only import do express no server.ts.',
+      highlights: [
+        'Resolução de Erro de Deploy no Cloud Run: Ajustada a importação de express no server.ts para "import type { Request, Response }", eliminando o SyntaxError de named export em módulos CommonJS no Node.js v22',
+        'Estabilidade de Inicialização do Servidor: Garantida a inicialização perfeita do servidor full-stack tanto em ambiente de desenvolvimento (tsx) quanto em produção (node server.ts)'
+      ]
+    },
     {
       version: 'v2.4.23',
       date: '22/10/2026',

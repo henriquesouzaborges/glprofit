@@ -42,7 +42,7 @@ export const SegurancaDadosModal: React.FC<SegurancaDadosModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-3 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
       <div className={`w-full max-w-2xl max-h-[90vh] rounded-2xl flex flex-col shadow-2xl relative border overflow-hidden transition-all ${
         isDarkMode 
           ? 'bg-[#141418] border-[#2c2c36] text-white' 

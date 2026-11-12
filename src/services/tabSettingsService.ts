@@ -1,4 +1,4 @@
-import { TabType } from '../components/Sidebar';
+import { TabType } from '../types';
 
 export interface TabConfigField {
   id: string;
@@ -39,7 +39,6 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
         title: 'Indicadores do Dia & Métricas',
         description: 'Personalize os cards e limiares de faturamento exibidos no topo.',
         fields: [
-          { id: 'show_access_feed', label: 'Feed de Catraca em Tempo Real', description: 'Exibir acessos de alunos em tempo real na tela inicial', type: 'toggle', value: true },
           { id: 'meta_diaria_faturamento', label: 'Meta de Faturamento Diário (R$)', description: 'Valor esperado de faturamento diário para cálculo da barra de progresso', type: 'number', value: 1200, unit: 'R$' },
           { id: 'alerta_inadimplentes_inicio', label: 'Card de Atenção a Inadimplentes', description: 'Destacar alertas de mensalidades em atraso no painel', type: 'toggle', value: true }
         ]
@@ -49,8 +48,7 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
         title: 'Atalhos e Ações Rápidas',
         description: 'Configure botões rápidos visíveis para a equipe de atendimento.',
         fields: [
-          { id: 'quick_sale_enabled', label: 'Habilitar PDV Rápido', description: 'Atalho para abertura rápida de vendas no balcão', type: 'toggle', value: true },
-          { id: 'turnstile_test_enabled', label: 'Atalho de Liberação de Catraca', description: 'Permite liberar acesso manual direto pelo painel inicial', type: 'toggle', value: true }
+          { id: 'quick_sale_enabled', label: 'Habilitar PDV Rápido', description: 'Atalho para abertura rápida de vendas no balcão', type: 'toggle', value: true }
         ]
       }
     ]
@@ -92,7 +90,7 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
         title: 'Regras de Alerta de Evasão',
         description: 'Defina os dias sem treino para acionar o protocolo de retenção de alunos.',
         fields: [
-          { id: 'dias_inatividade_churn', label: 'Dias de Ausência para Alerta de Churn', description: 'Alunos sem passar na catraca por este período são marcados em risco', type: 'number', value: 10, unit: 'dias' },
+          { id: 'dias_inatividade_churn', label: 'Dias de Ausência para Alerta de Churn', description: 'Alunos ausentes nos treinos por este período são marcados em risco', type: 'number', value: 10, unit: 'dias' },
           { id: 'auto_tag_risco', label: 'Etiquetagem Automática no CRM', description: 'Enviar automaticamente para a coluna de resgate no CRM', type: 'toggle', value: true }
         ]
       }
@@ -103,7 +101,7 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
   clientes: {
     tab: 'clientes',
     title: 'Clientes & Alunos',
-    description: 'Regras cadastrais, carência de inadimplência e integração com catraca.',
+    description: 'Regras cadastrais, carência e políticas de inadimplência.',
     groups: [
       {
         id: 'cadastro',
@@ -117,11 +115,10 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
       },
       {
         id: 'carencia_bloqueio',
-        title: 'Tolerância Financeira & Acesso',
-        description: 'Configurações de tolerância de atraso antes de bloquear a entrada.',
+        title: 'Tolerância Financeira',
+        description: 'Configurações de carência e tolerância para mensalidades em atraso.',
         fields: [
-          { id: 'dias_carencia_inadimplente', label: 'Dias de Tolerância Após Vencimento', description: 'Número de dias que o aluno inadimplente ainda pode acessar a academia', type: 'number', value: 3, unit: 'dias' },
-          { id: 'bloquear_catraca_inadimplente', label: 'Bloqueio Automático de Catraca', description: 'Trancar a catraca automaticamente após estourar a carência', type: 'toggle', value: true }
+          { id: 'dias_carencia_inadimplente', label: 'Dias de Tolerância Após Vencimento', description: 'Número de dias de carência antes de considerar o aluno como inadimplente', type: 'number', value: 3, unit: 'dias' }
         ]
       }
     ]
@@ -236,35 +233,6 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
         ]
       },
       {
-        id: 'catraca_presenca_auto',
-        title: 'Presença Automática via Catraca',
-        description: 'Ao passar pelo torniquete ou catraca, o aluno ganha presença automática na agenda daquela aula.',
-        fields: [
-          { 
-            id: 'presenca_automatica_catraca', 
-            label: 'Presença Automática na Agenda ao Passar na Catraca', 
-            description: 'Concede presença automática imediata na turma agendada quando o aluno tem a entrada liberada na catraca', 
-            type: 'toggle', 
-            value: true 
-          },
-          { 
-            id: 'janela_tolerancia_catraca', 
-            label: 'Janela de Tolerância da Catraca (minutos)', 
-            description: 'Minutos de antecedência permitidos para que a entrada na catraca valide a presença na aula', 
-            type: 'number', 
-            value: 60, 
-            unit: 'min' 
-          },
-          { 
-            id: 'notificar_presenca_catraca', 
-            label: 'Notificação em Tempo Real de Presença Automática', 
-            description: 'Exibir aviso instantâneo no sistema e registrar no histórico de notificações', 
-            type: 'toggle', 
-            value: true 
-          }
-        ]
-      },
-      {
         id: 'agenda_rules',
         title: 'Regras de Grade & Agendamento',
         description: 'Controle de capacidade de turmas e prazos de cancelamento.',
@@ -341,7 +309,7 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
         fields: [
           { id: 'limite_dor_alerta_treinador', label: 'Limiar de Dor EVA para Acionar Treinador', description: 'Notas de dor acima deste valor alertam o professor no início do treino', type: 'number', value: 5, unit: 'EVA (0-10)' },
           { id: 'score_prontidao_critico', label: 'Prontidão Crítica (Hooper Elevado)', description: 'Pontuação Hooper que aciona bandeira vermelha no painel', type: 'number', value: 20, unit: 'pts' },
-          { id: 'exigir_checkin_matinal', label: 'Sugerir Check-in Antes do Treino', description: 'Exibir pop-up ao passar a digital na catraca se não preencheu hoje', type: 'toggle', value: true },
+          { id: 'exigir_checkin_matinal', label: 'Sugerir Check-in Antes do Treino', description: 'Sugerir preenchimento diário do questionário de prontidão', type: 'toggle', value: true },
           { id: 'notificar_whatsapp_coach', label: 'Notificar Coach em Dores Fortes (EVA >= 7)', description: 'Disparar alerta direto no WhatsApp do treinador responsável', type: 'toggle', value: true }
         ]
       }
@@ -428,8 +396,8 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
   // 12. COMANDAS
   comandas: {
     tab: 'comandas',
-    title: 'Comandas & Lanchonete',
-    description: 'Limite de crédito em conta, consumo avulso e débito automático.',
+    title: 'Lanchonete da Empresa',
+    description: 'Controle de consumo na lanchonete, limite de crédito e pedidos dos alunos.',
     groups: [
       {
         id: 'comandas_rules',
@@ -462,40 +430,7 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
     ]
   },
 
-  // 13. CATRACA
-  catraca: {
-    tab: 'catraca',
-    title: 'Catraca & Controle de Acesso',
-    description: 'Controle biométrico, anti-dupla entrada e tempo de liberação da trava.',
-    groups: [
-      {
-        id: 'catraca_rules',
-        title: 'Hardware & Liberação de Acesso',
-        description: 'Parâmetros de comunicação e segurança do leitor biométrico/facial.',
-        fields: [
-          { id: 'tempo_rele_segundos', label: 'Tempo de Abertura da Trava (segundos)', description: 'Duração em que o solenóide mantém a catraca liberada para giro', type: 'number', value: 6, unit: 'seg' },
-          { id: 'anti_passback_ativo', label: 'Proteção Anti-Passback (Anti-Dupla Entrada)', description: 'Impede que o mesmo aluno use a digital duas vezes seguidas na entrada', type: 'toggle', value: true },
-          { id: 'bloquear_sem_atestado', label: 'Bloquear Alunos Sem Atestado Médico Válido', description: 'Exige liberação médica para destravar a catraca', type: 'toggle', value: false }
-        ]
-      },
-      {
-        id: 'catraca_agenda_sync',
-        title: 'Integração de Presença com a Agenda',
-        description: 'Sincronização imediata entre o giro do torniquete e a chamada da turma do dia.',
-        fields: [
-          { 
-            id: 'presenca_automatica_catraca', 
-            label: 'Presença Automática na Turma ao Passar na Catraca', 
-            description: 'Concede presença automática imediata na turma agendada quando o aluno tem a entrada liberada', 
-            type: 'toggle', 
-            value: true 
-          }
-        ]
-      }
-    ]
-  },
-
-  // 14. NUTRIÇÃO
+  // 13. NUTRIÇÃO
   nutricao: {
     tab: 'nutricao',
     title: 'Nutrição & Dietas',
@@ -677,29 +612,6 @@ export const saveTabConfiguration = (config: TabConfiguration): void => {
     
     const key = config.subTab ? `${config.tab}_${config.subTab}` : config.tab;
     storedMap[key] = config;
-    
-    // Sincronizar configurações cruzadas entre Agenda e Catraca
-    if (key === 'agenda_calendario') {
-      const catracaPresencaField = config.groups
-        .flatMap(g => g.fields)
-        .find(f => f.id === 'presenca_automatica_catraca');
-      if (catracaPresencaField && storedMap['catraca']) {
-        storedMap['catraca'].groups = storedMap['catraca'].groups.map(g => ({
-          ...g,
-          fields: g.fields.map(f => f.id === 'presenca_automatica_catraca' ? { ...f, value: catracaPresencaField.value } : f)
-        }));
-      }
-    } else if (key === 'catraca') {
-      const catracaPresencaField = config.groups
-        .flatMap(g => g.fields)
-        .find(f => f.id === 'presenca_automatica_catraca');
-      if (catracaPresencaField && storedMap['agenda_calendario']) {
-        storedMap['agenda_calendario'].groups = storedMap['agenda_calendario'].groups.map(g => ({
-          ...g,
-          fields: g.fields.map(f => f.id === 'presenca_automatica_catraca' ? { ...f, value: catracaPresencaField.value } : f)
-        }));
-      }
-    }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(storedMap));
 
@@ -808,13 +720,13 @@ const TAB_DISPLAY_NAMES: Record<string, string> = {
   financeiro: 'Financeiro',
   vendas: 'Vendas & PDV',
   estoque: 'Estoque',
-  comandas: 'Comandas',
+  comandas: 'Lanchonete',
   treino: 'Treino',
   avaliacoes: 'Avaliações Físicas',
   nutricao: 'Nutrição',
   bem_estar: 'Bem-Estar',
   relatorios: 'Relatórios',
-  catraca: 'Catraca',
+  empresas_clientes: 'Empresas Clientes',
   configuracoes: 'Configurações'
 };
 
@@ -942,9 +854,6 @@ export const getActiveSubTabInfo = (
 
 export interface AgendaSettingsConfig {
   modoChamada: 'dedao' | 'tradicional';
-  presencaAutomaticaCatraca: boolean;
-  janelaToleranciaMinutos: number;
-  notificarPresencaCatraca: boolean;
   feedbackSonoro: boolean;
 }
 
@@ -961,18 +870,12 @@ export const getAgendaSettings = (): AgendaSettingsConfig => {
 
     return {
       modoChamada: findField('modo_chamada_professor', 'dedao'),
-      presencaAutomaticaCatraca: Boolean(findField('presenca_automatica_catraca', true)),
-      janelaToleranciaMinutos: Number(findField('janela_tolerancia_catraca', 60)),
-      notificarPresencaCatraca: Boolean(findField('notificar_presenca_catraca', true)),
       feedbackSonoro: Boolean(findField('feedback_sonoro_chamada', true))
     };
   } catch (err) {
     console.error('Erro ao ler agenda settings:', err);
     return {
       modoChamada: 'dedao',
-      presencaAutomaticaCatraca: true,
-      janelaToleranciaMinutos: 60,
-      notificarPresencaCatraca: true,
       feedbackSonoro: true
     };
   }
@@ -986,15 +889,6 @@ export const updateAgendaSettings = (updates: Partial<AgendaSettingsConfig>): vo
       fields: group.fields.map(field => {
         if (updates.modoChamada !== undefined && field.id === 'modo_chamada_professor') {
           return { ...field, value: updates.modoChamada };
-        }
-        if (updates.presencaAutomaticaCatraca !== undefined && field.id === 'presenca_automatica_catraca') {
-          return { ...field, value: updates.presencaAutomaticaCatraca };
-        }
-        if (updates.janelaToleranciaMinutos !== undefined && field.id === 'janela_tolerancia_catraca') {
-          return { ...field, value: updates.janelaToleranciaMinutos };
-        }
-        if (updates.notificarPresencaCatraca !== undefined && field.id === 'notificar_presenca_catraca') {
-          return { ...field, value: updates.notificarPresencaCatraca };
         }
         if (updates.feedbackSonoro !== undefined && field.id === 'feedback_sonoro_chamada') {
           return { ...field, value: updates.feedbackSonoro };

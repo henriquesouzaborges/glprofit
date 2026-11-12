@@ -59,11 +59,11 @@ export const WhatsappChatbotView: React.FC<WhatsappChatbotViewProps> = ({
       const lower = userText.toLowerCase();
 
       if (userText === '1' || lower.includes('plano') || lower.includes('preço') || lower.includes('valor')) {
-        botReply = '⭐ *Planos Oficiais VB SPORT*:\n\n1. *Plano Anual Black VIP*: R$ 119,90/mês (Musculação + CrossFit + Spinning + Natação + Catraca Livre)\n2. *Plano Semestral Fit*: R$ 139,90/mês\n3. *Plano Mensal Livre*: R$ 169,90/mês\n\nTodos os planos incluem o aplicativo exclusivo VB SPORT com ficha de treino digital!\n\nDeseja agendar sua aula experimental grátis para hoje? Digite 2!';
+        botReply = '⭐ *Planos Oficiais VB SPORT*:\n\n1. *Plano Anual Black VIP*: R$ 119,90/mês (Musculação + CrossFit + Spinning + Natação + Acesso Total Livre)\n2. *Plano Semestral Fit*: R$ 139,90/mês\n3. *Plano Mensal Livre*: R$ 169,90/mês\n\nTodos os planos incluem o aplicativo exclusivo VB SPORT com ficha de treino digital!\n\nDeseja agendar sua aula experimental grátis para hoje? Digite 2!';
       } else if (userText === '2' || lower.includes('experimental') || lower.includes('agendar') || lower.includes('conhecer')) {
         botReply = '🎉 Maravilha! Na VB SPORT você tem direito a 1 aula experimental gratuita em qualquer modalidade (CrossFit, Musculação, Pilates, Spinning ou Beach Tennis)!\n\nQual dia e período fica melhor para você? (Manhã, Tarde ou Noite)?';
       } else if (userText === '3' || lower.includes('pix') || lower.includes('boleto') || lower.includes('pagar') || lower.includes('financeiro')) {
-        botReply = '💳 *Autoatendimento Financeiro GL PRO FIT*:\n\nNossa chave PIX oficial é: *financeiro@glprofit.com.br*\n\nOu acesse sua fatura segura com cartão recorrente no *GL Profit Pay*: https://pay.glprofit.com.br/aluno\n\nAssim que o pagamento é identificado, sua catraca é liberada em menos de 1 minuto!';
+        botReply = '💳 *Autoatendimento Financeiro GL PRO FIT*:\n\nNossa chave PIX oficial é: *financeiro@glprofit.com.br*\n\nOu acesse sua fatura segura com cartão recorrente no *GL Profit Pay*: https://pay.glprofit.com.br/aluno\n\nAssim que o pagamento é identificado, seu plano é regularizado em menos de 1 minuto!';
       } else if (userText === '4' || lower.includes('atendente') || lower.includes('humano') || lower.includes('falar')) {
         botReply = 'Transferindo você imediatamente para um de nossos atendentes humanos na recepção... ⏳\n\nTempo médio de espera: menos de 2 minutos. Um consultor já irá te responder aqui no chat!';
       } else {

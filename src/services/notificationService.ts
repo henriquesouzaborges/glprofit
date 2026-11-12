@@ -3,7 +3,6 @@ import { TabType } from '../types';
 export type PushNotificationType = 'info' | 'success' | 'warning' | 'error' | 'alert';
 
 export type PushNotificationModule = 
-  | 'catraca' 
   | 'financeiro' 
   | 'professores' 
   | 'tarefas' 
@@ -20,14 +19,11 @@ export type NotificationEventType =
   | 'fatura_vencida'
   | 'pagamento_recebido'
   | 'venda_pdv'
-  | 'catraca_liberada'
-  | 'catraca_bloqueada'
   | 'folha_ponto_presenca'
   | 'folha_ponto_lembrete'
   | 'tarefa_delegada'
   | 'tarefa_concluida'
   | 'agenda_compromisso'
-  | 'catraca_presenca_auto'
   | 'crm_novo_lead';
 
 export interface PushNotification {
@@ -54,8 +50,6 @@ export interface PushNotificationPreferences {
   fatura_vencida: boolean;
   pagamento_recebido: boolean;
   venda_pdv: boolean;
-  catraca_liberada: boolean;
-  catraca_bloqueada: boolean;
   folha_ponto_presenca: boolean;
   folha_ponto_lembrete: boolean;
   tarefa_delegada: boolean;
@@ -72,8 +66,6 @@ export const DEFAULT_PUSH_PREFERENCES: PushNotificationPreferences = {
   fatura_vencida: true,
   pagamento_recebido: true,
   venda_pdv: true,
-  catraca_liberada: true,
-  catraca_bloqueada: true,
   folha_ponto_presenca: true,
   folha_ponto_lembrete: true,
   tarefa_delegada: true,
@@ -103,56 +95,7 @@ export function savePushNotificationPreferences(prefs: PushNotificationPreferenc
   }
 }
 
-export const INITIAL_NOTIFICATIONS: PushNotification[] = [
-  {
-    id: 'notif-1',
-    title: 'Acesso Registrado na Catraca',
-    message: 'Aluno Marcos Silva acessou a Catraca 01 (Entrada Liberada - Plano Trimestral).',
-    type: 'success',
-    module: 'catraca',
-    eventType: 'catraca_liberada',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    read: false,
-    linkTab: 'catraca',
-    actionLabel: 'Ver Catraca'
-  },
-  {
-    id: 'notif-2',
-    title: 'Nova Tarefa Atribuída',
-    message: 'Gianluca Marinho atribuiu: "Lubrificar cabos de aço dos crossovers" para Prof. Rodrigo.',
-    type: 'info',
-    module: 'tarefas',
-    eventType: 'tarefa_delegada',
-    timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    read: false,
-    linkTab: 'professores',
-    actionLabel: 'Ver Tarefas'
-  },
-  {
-    id: 'notif-3',
-    title: 'Folha de Ponto Atualizada',
-    message: 'Prof. Carlos Eduardo confirmou presença na turma Futebol Sub-9 (1.5h - R$ 90,00).',
-    type: 'success',
-    module: 'professores',
-    eventType: 'folha_ponto_presenca',
-    timestamp: new Date(Date.now() - 1000 * 60 * 55).toISOString(),
-    read: false,
-    linkTab: 'professores',
-    actionLabel: 'Ver Diário'
-  },
-  {
-    id: 'notif-4',
-    title: 'Mensalidade Próxima do Vencimento',
-    message: '3 mensalidades recorrentes vencem amanhã no módulo Financeiro.',
-    type: 'warning',
-    module: 'financeiro',
-    eventType: 'fatura_vencida',
-    timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    read: true,
-    linkTab: 'financeiro',
-    actionLabel: 'Ver Contas'
-  }
-];
+export const INITIAL_NOTIFICATIONS: PushNotification[] = [];
 
 export function getStoredNotifications(): PushNotification[] {
   try {

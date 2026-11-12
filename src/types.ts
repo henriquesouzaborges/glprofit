@@ -5,6 +5,7 @@ export interface Student {
   code: string;
   name: string;
   photo: string;
+  photoUrl?: string;
   email: string;
   phone: string;
   cpf: string;
@@ -12,6 +13,7 @@ export interface Student {
   status: StudentStatus;
   planId: string;
   planName: string;
+  plan?: string;
   planPrice: number;
   startDate: string;
   endDate: string;
@@ -19,6 +21,11 @@ export interface Student {
   lastAccess?: string;
   pendingAmount: number;
   notes?: string;
+  consentLgpd?: boolean;
+  consentLgpdDate?: string;
+  consentLgpdVersion?: string;
+  gender?: 'masculino' | 'feminino';
+  enrollmentNumber?: string;
 }
 
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'boleto';
@@ -72,7 +79,7 @@ export interface EnrolledStudent {
   checkedIn: boolean;
   status?: 'presente' | 'falta' | 'pendente';
   checkInTime?: string;
-  checkInSource?: 'manual' | 'professor' | 'catraca';
+  checkInSource?: 'manual' | 'professor';
 }
 
 export interface ClassSession {
@@ -305,6 +312,7 @@ export interface PhysicalAssessmentData {
     idealWeightKg: number;
     classification: 'Atleta' | 'Excelente' | 'Bom' | 'Médio' | 'Elevado' | 'Obesidade' | 'Regular';
   };
+  bodyComp?: any;
   perimetry: {
     pescoco?: number;
     ombros?: number;
@@ -414,19 +422,6 @@ export interface WellnessCheckin {
   coachAlertSent?: boolean;
 }
 
-export interface AccessLog {
-  id: string;
-  studentId: string;
-  studentName: string;
-  studentCode: string;
-  photo?: string;
-  timestamp: string;
-  type: 'entrada' | 'saida';
-  status: 'liberado' | 'bloqueado';
-  reason?: string;
-  turnstile: string;
-}
-
 export type LeadStage = 'novo' | 'agendado' | 'compareceu' | 'negociacao' | 'matriculado' | 'perdido';
 
 export type CrmSubTab = 'leads' | 'kambam' | 'atividades' | 'automacoes' | 'pesquisas';
@@ -524,6 +519,7 @@ export interface SystemUser {
   createdAt: string;
   lastLogin?: string;
   permissions: string[];
+  mustChangePassword?: boolean;
   password?: string;
 }
 
@@ -770,6 +766,25 @@ export interface WhatsappChatbotFlow {
   description: string;
 }
 
+export type EmpresasClientesSubTab = 'dashboard' | 'licencas';
+
+export interface EmpresaCliente {
+  id: string;
+  name: string;
+  cnpj: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  planName: string;
+  monthlyValue: number;
+  status: 'ativo' | 'bloqueado' | 'pendente';
+  dueDate: string;
+  activatedAt: string;
+  allowedModules: TabType[];
+  maxUsers: number;
+  notes?: string;
+}
+
 export type TabType = 
   | 'inicio' 
   | 'dashboards' 
@@ -787,7 +802,27 @@ export type TabType =
   | 'vendas' 
   | 'estoque' 
   | 'comandas' 
-  | 'catraca' 
   | 'relatorios' 
+  | 'empresas_clientes'
   | 'configuracoes';
+
+export const DEFAULT_STUDENT_FALLBACK: Student = {
+  id: 'std-fallback',
+  code: '001',
+  name: 'Aluno Exemplo',
+  photo: '',
+  email: 'aluno@exemplo.com',
+  phone: '(11) 99999-9999',
+  cpf: '000.000.000-00',
+  birthDate: '1995-01-01',
+  status: 'ativo',
+  planId: 'p1',
+  planName: 'Plano Musculação',
+  planPrice: 120,
+  startDate: '2026-01-01',
+  endDate: '2026-12-31',
+  dueDate: '2026-12-10',
+  pendingAmount: 0
+};
+
 

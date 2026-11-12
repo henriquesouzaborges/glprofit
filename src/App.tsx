@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   INITIAL_SETTINGS, 
   INITIAL_PLANS, 
@@ -7,7 +7,6 @@ import {
   INITIAL_TRANSACTIONS, 
   INITIAL_CLASSES, 
   INITIAL_WORKOUTS, 
-  INITIAL_ACCESS_LOGS, 
   INITIAL_LEADS,
   INITIAL_COMANDAS,
   INITIAL_STOCK_MOVEMENTS,
@@ -27,7 +26,6 @@ import {
   Product, 
   ClassSession, 
   WorkoutPlan, 
-  AccessLog, 
   Lead, 
   LeadStage, 
   GymSettings,
@@ -52,7 +50,10 @@ import {
   FinanceiroSubTab,
   ProfessoresSubTab,
   SystemUser,
-  SystemUserRole
+  SystemUserRole,
+  EmpresaCliente,
+  EmpresasClientesSubTab,
+  TabType
 } from './types';
 import { 
   getActiveSessionUser, 
@@ -64,30 +65,34 @@ import {
 } from './services/userService';
 import { Lock, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import { Header } from './components/Header';
-import { Sidebar, TabType } from './components/Sidebar';
-import { InicioTab } from './components/tabs/InicioTab';
-import { DashboardsTab, DashboardSubTab } from './components/tabs/DashboardsTab';
-import { AlunosTab } from './components/tabs/AlunosTab';
-import { ProfessoresTab } from './components/tabs/ProfessoresTab';
-import { CrmTab } from './components/tabs/CrmTab';
-import { AgendaTab } from './components/tabs/AgendaTab';
-import { WhatsappTab, WhatsappTargetChat } from './components/tabs/whatsapp/WhatsappTab';
-import { VbSportPayTab } from './components/tabs/VbSportPayTab';
-import { FinanceiroTab } from './components/tabs/FinanceiroTab';
-import { EstoqueTab } from './components/tabs/EstoqueTab';
-import { ComandasTab } from './components/tabs/ComandasTab';
-import { TreinosTab } from './components/tabs/TreinosTab';
-import { AvaliacoesFisicasTab } from './components/tabs/AvaliacoesFisicasTab';
-import { NutricaoTab } from './components/tabs/NutricaoTab';
-import { BemEstarTab } from './components/tabs/BemEstarTab';
-import { RelatoriosTab } from './components/tabs/RelatoriosTab';
-import { CatracaTab } from './components/tabs/CatracaTab';
-import { ConfiguracoesTab, ConfigSubTab } from './components/tabs/ConfiguracoesTab';
-import { VendasTab } from './components/tabs/VendasTab';
+import { TopNav } from './components/TopNav';
+import type { DashboardSubTab } from './components/tabs/DashboardsTab';
+import type { WhatsappTargetChat } from './components/tabs/whatsapp/WhatsappTab';
+import type { ConfigSubTab } from './components/tabs/ConfiguracoesTab';
+import { EmpresasClientesTab, INITIAL_EMPRESAS_CLIENTES } from './components/tabs/EmpresasClientesTab';
 import { NovoAlunoModal } from './components/modals/NovoAlunoModal';
-import { FichaAlunoModal } from './components/modals/FichaAlunoModal';
 import { TabConfigModal } from './components/modals/TabConfigModal';
 import { getActiveSubTabInfo, getAgendaSettings } from './services/tabSettingsService';
+
+// Lazy-loaded Tabs para ganho de performance e otimização de bundle inicial
+const InicioTab = lazy(() => import('./components/tabs/InicioTab').then(m => ({ default: m.InicioTab })));
+const DashboardsTab = lazy(() => import('./components/tabs/DashboardsTab').then(m => ({ default: m.DashboardsTab })));
+const AlunosTab = lazy(() => import('./components/tabs/AlunosTab').then(m => ({ default: m.AlunosTab })));
+const ProfessoresTab = lazy(() => import('./components/tabs/ProfessoresTab').then(m => ({ default: m.ProfessoresTab })));
+const CrmTab = lazy(() => import('./components/tabs/CrmTab').then(m => ({ default: m.CrmTab })));
+const AgendaTab = lazy(() => import('./components/tabs/AgendaTab').then(m => ({ default: m.AgendaTab })));
+const WhatsappTab = lazy(() => import('./components/tabs/whatsapp/WhatsappTab').then(m => ({ default: m.WhatsappTab })));
+const VbSportPayTab = lazy(() => import('./components/tabs/VbSportPayTab').then(m => ({ default: m.VbSportPayTab })));
+const FinanceiroTab = lazy(() => import('./components/tabs/FinanceiroTab').then(m => ({ default: m.FinanceiroTab })));
+const EstoqueTab = lazy(() => import('./components/tabs/EstoqueTab').then(m => ({ default: m.EstoqueTab })));
+const ComandasTab = lazy(() => import('./components/tabs/ComandasTab').then(m => ({ default: m.ComandasTab })));
+const TreinosTab = lazy(() => import('./components/tabs/TreinosTab').then(m => ({ default: m.TreinosTab })));
+const AvaliacoesFisicasTab = lazy(() => import('./components/tabs/AvaliacoesFisicasTab').then(m => ({ default: m.AvaliacoesFisicasTab })));
+const NutricaoTab = lazy(() => import('./components/tabs/NutricaoTab').then(m => ({ default: m.NutricaoTab })));
+const BemEstarTab = lazy(() => import('./components/tabs/BemEstarTab').then(m => ({ default: m.BemEstarTab })));
+const RelatoriosTab = lazy(() => import('./components/tabs/RelatoriosTab').then(m => ({ default: m.RelatoriosTab })));
+const ConfiguracoesTab = lazy(() => import('./components/tabs/ConfiguracoesTab').then(m => ({ default: m.ConfiguracoesTab })));
+const VendasTab = lazy(() => import('./components/tabs/VendasTab').then(m => ({ default: m.VendasTab })));
 import { LoginPage } from './components/LoginPage';
 import { CadastroPage } from './components/CadastroPage';
 import { Footer } from './components/Footer';
@@ -96,10 +101,29 @@ import { dispatchPushNotification } from './services/notificationService';
 import { 
   initializeDatabase, 
   subscribeToFirestoreCollection, 
-  syncCollectionToFirestore 
+  syncCollectionToFirestore,
+  saveDocToFirestore,
+  deleteDocFromFirestore
 } from './services/firebaseDbService';
 
 export default function App() {
+  // Purge legacy mock data from browser localStorage on initial boot for v2.5.3 clean slate
+  if (typeof window !== 'undefined' && localStorage.getItem('glprofit_clean_slate_v253') !== 'true') {
+    const keysToRemove = [
+      'vbsport_students', 'vbsport_transactions', 'vbsport_workouts',
+      'vbsport_classes', 'vbsport_leads', 'vbsport_products',
+      'vbsport_comandas', 'vbsport_stock_movements', 'vbsport_suppliers',
+      'vbsport_pay_recurring', 'vbsport_payment_links', 'vbsport_crm_activities',
+      'vbsport_surveys', 'vbsport_calendar_events', 'vbsport_empresas_clientes',
+      'vbsport_whatsapp_chats', 'vbsport_whatsapp_campaigns', 'vbsport_whatsapp_config',
+      'vbsport_folha_teachers', 'vbsport_folha_turmas', 'vbsport_folha_eventos',
+      'vbsport_folha_records', 'vbsport_load_logs', 'vbsport_physical_tests',
+      'vbsport_partner_school_licenses', 'glfit_elenco_groups', 'glfit_users_v2'
+    ];
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('glprofit_clean_slate_v253', 'true');
+  }
+
   const [currentUser, setCurrentUser] = useState<SystemUser>(() => getActiveSessionUser());
 
   // Navigation State - defaults to first allowed tab for current active user
@@ -117,13 +141,49 @@ export default function App() {
   const [bemEstarSubTab, setBemEstarSubTab] = useState<BemEstarSubTab>('checkin');
   const [whatsappSubTab, setWhatsappSubTab] = useState<WhatsappSubTab>('atendimento');
   const [financeiroSubTab, setFinanceiroSubTab] = useState<FinanceiroSubTab>('receber');
+  const [empresasClientesSubTab, setEmpresasClientesSubTab] = useState<EmpresasClientesSubTab>('dashboard');
   const [configuracoesSubTab, setConfiguracoesSubTab] = useState<ConfigSubTab>('geral');
-  const [isTabConfigModalOpen, setIsTabConfigModalOpen] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    const saved = localStorage.getItem('vbsport_sidebar_collapsed');
-    return saved ? JSON.parse(saved) : false;
+
+  const [empresasClientes, setEmpresasClientes] = useState<EmpresaCliente[]>(() => {
+    const saved = localStorage.getItem('vbsport_empresas_clientes');
+    return saved ? JSON.parse(saved) : INITIAL_EMPRESAS_CLIENTES;
   });
+
+  useEffect(() => {
+    localStorage.setItem('vbsport_empresas_clientes', JSON.stringify(empresasClientes));
+    syncCollectionToFirestore('empresas_clientes', empresasClientes);
+  }, [empresasClientes]);
+
+  const handleAddEmpresa = async (emp: EmpresaCliente) => {
+    setEmpresasClientes(prev => [emp, ...prev]);
+    try {
+      await saveDocToFirestore('empresas_clientes', emp);
+      showToast(`Empresa "${emp.name}" cadastrada com sucesso!`);
+    } catch (err) {
+      showToast('Erro ao salvar empresa no Firestore.');
+    }
+  };
+
+  const handleUpdateEmpresa = async (emp: EmpresaCliente) => {
+    setEmpresasClientes(prev => prev.map(e => e.id === emp.id ? emp : e));
+    try {
+      await saveDocToFirestore('empresas_clientes', emp);
+      showToast(`Empresa "${emp.name}" atualizada.`);
+    } catch (err) {
+      showToast('Erro ao atualizar empresa no Firestore.');
+    }
+  };
+
+  const handleDeleteEmpresa = async (id: string) => {
+    setEmpresasClientes(prev => prev.filter(e => e.id !== id));
+    try {
+      await deleteDocFromFirestore('empresas_clientes', id);
+      showToast('Empresa removida.');
+    } catch (err) {
+      showToast('Erro ao remover empresa no Firestore.');
+    }
+  };
+  const [isTabConfigModalOpen, setIsTabConfigModalOpen] = useState(false);
 
   // Auth State (defaults to false on fresh start to show requested login page immediately)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -229,6 +289,17 @@ export default function App() {
       return;
     }
 
+    // Verificar se a empresa associada ao usuário está bloqueada
+    const matchedEmpresa = empresasClientes.find(e => 
+      e.email?.toLowerCase() === data.email.toLowerCase() || 
+      (resolvedUser?.name && e.name.toLowerCase().includes(resolvedUser.name.toLowerCase()))
+    );
+    if (matchedEmpresa && matchedEmpresa.status === 'bloqueado') {
+      showToast(`Acesso Suspenso: A empresa "${matchedEmpresa.name}" está com o contrato bloqueado pelo administrador B2B.`);
+      setIsAuthenticated(false);
+      return;
+    }
+
     setActiveSessionUser(resolvedUser);
     setCurrentUser(resolvedUser);
     setIsAuthenticated(true);
@@ -251,10 +322,6 @@ export default function App() {
     localStorage.removeItem('vbsport_auth_session');
     showToast('Você saiu da sua conta.');
   };
-
-  useEffect(() => {
-    localStorage.setItem('vbsport_sidebar_collapsed', JSON.stringify(isSidebarCollapsed));
-  }, [isSidebarCollapsed]);
 
   // Persistence States
   const [settings, setSettings] = useState<GymSettings>(() => {
@@ -292,10 +359,6 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_WORKOUTS;
   });
 
-  const [accessLogs, setAccessLogs] = useState<AccessLog[]>(() => {
-    const saved = localStorage.getItem('vbsport_access_logs');
-    return saved ? JSON.parse(saved) : INITIAL_ACCESS_LOGS;
-  });
 
   const [leads, setLeads] = useState<Lead[]>(() => {
     const saved = localStorage.getItem('vbsport_leads');
@@ -350,7 +413,6 @@ export default function App() {
   // Modal States
   const [isNewStudentModalOpen, setIsNewStudentModalOpen] = useState(false);
   const [selectedStudentForSheet, setSelectedStudentForSheet] = useState<Student | null>(null);
-  const [studentToTestInTurnstile, setStudentToTestInTurnstile] = useState<Student | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [whatsappTarget, setWhatsappTarget] = useState<WhatsappTargetChat | null>(null);
 
@@ -371,7 +433,6 @@ export default function App() {
         setCurrentTab('whatsapp');
         setSelectedStudentForSheet(null);
         setIsNewStudentModalOpen(false);
-        setStudentToTestInTurnstile(null);
         const contactIdentifier = customEvent.detail.contactName 
           ? `${customEvent.detail.contactName} (${customEvent.detail.phone})`
           : customEvent.detail.phone;
@@ -401,7 +462,6 @@ export default function App() {
     const unsubTx = subscribeToFirestoreCollection('financial_transactions', (data) => setTransactions(data), INITIAL_TRANSACTIONS);
     const unsubClasses = subscribeToFirestoreCollection('classes', (data) => setClasses(data), INITIAL_CLASSES);
     const unsubWorkouts = subscribeToFirestoreCollection('workouts', (data) => setWorkouts(data), INITIAL_WORKOUTS);
-    const unsubLogs = subscribeToFirestoreCollection('access_logs', (data) => setAccessLogs(data), INITIAL_ACCESS_LOGS);
     const unsubLeads = subscribeToFirestoreCollection('leads', (data) => setLeads(data), INITIAL_LEADS);
     const unsubProducts = subscribeToFirestoreCollection('products', (data) => setProducts(data), INITIAL_PRODUCTS);
     const unsubComandas = subscribeToFirestoreCollection('comandas', (data) => setComandas(data), INITIAL_COMANDAS);
@@ -413,6 +473,7 @@ export default function App() {
     const unsubAutomations = subscribeToFirestoreCollection('crm_automations', (data) => setCrmAutomations(data), INITIAL_CRM_AUTOMATIONS);
     const unsubSurveys = subscribeToFirestoreCollection('satisfaction_surveys', (data) => setSatisfactionSurveys(data), INITIAL_SATISFACTION_SURVEYS);
     const unsubCalendar = subscribeToFirestoreCollection('calendar_events', (data) => setCalendarEvents(data), INITIAL_CALENDAR_EVENTS);
+    const unsubEmpresas = subscribeToFirestoreCollection('empresas_clientes', (data) => setEmpresasClientes(data), INITIAL_EMPRESAS_CLIENTES);
 
     return () => {
       unsubSettings();
@@ -421,7 +482,6 @@ export default function App() {
       unsubTx();
       unsubClasses();
       unsubWorkouts();
-      unsubLogs();
       unsubLeads();
       unsubProducts();
       unsubComandas();
@@ -433,6 +493,7 @@ export default function App() {
       unsubAutomations();
       unsubSurveys();
       unsubCalendar();
+      unsubEmpresas();
     };
   }, []);
 
@@ -467,10 +528,6 @@ export default function App() {
     syncCollectionToFirestore('workouts', workouts);
   }, [workouts]);
 
-  useEffect(() => {
-    localStorage.setItem('vbsport_access_logs', JSON.stringify(accessLogs));
-    syncCollectionToFirestore('access_logs', accessLogs);
-  }, [accessLogs]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_leads', JSON.stringify(leads));
@@ -612,7 +669,26 @@ export default function App() {
     if (selectedStudentForSheet && selectedStudentForSheet.id === studentId) {
       setSelectedStudentForSheet(prev => prev ? { ...prev, status: 'ativo', pendingAmount: 0 } : null);
     }
-    showToast('Mensalidade quitada! Cliente regularizado e liberado na catraca.');
+    showToast('Mensalidade quitada! Cliente regularizado com sucesso.');
+  };
+
+  const handleUpdateStudent = (updatedStudent: Student) => {
+    setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+    if (selectedStudentForSheet && selectedStudentForSheet.id === updatedStudent.id) {
+      setSelectedStudentForSheet(updatedStudent);
+    }
+    showToast(`Cadastro de ${updatedStudent.name} atualizado com sucesso!`);
+  };
+
+  const handleAddSaleTransaction = (tx: FinancialTransaction, updatedStudent?: Student) => {
+    setTransactions(prev => [tx, ...prev]);
+    if (updatedStudent) {
+      setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+      if (selectedStudentForSheet && selectedStudentForSheet.id === updatedStudent.id) {
+        setSelectedStudentForSheet(updatedStudent);
+      }
+    }
+    showToast(`Venda registrada com sucesso! ${tx.description}`);
   };
 
   const handleCompleteSale = (tx: FinancialTransaction) => {
@@ -731,72 +807,7 @@ export default function App() {
     showToast(`Cliente ${student.name} inscrito na turma!`);
   };
 
-  const handleRegisterAccess = (log: AccessLog) => {
-    setAccessLogs(prev => [log, ...prev]);
-    setStudents(prev => prev.map(s => {
-      if (s.id === log.studentId) {
-        return { ...s, lastAccess: log.timestamp };
-      }
-      return s;
-    }));
 
-    // Integração Catraca -> Presença Automática na Agenda
-    const agendaSettings = getAgendaSettings();
-    if (log.status === 'liberado' && log.type === 'entrada' && agendaSettings.presencaAutomaticaCatraca) {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      let autoMarkedClassTitle: string | null = null;
-
-      setClasses(prev => prev.map(c => {
-        const isEnrolled = c.enrolledStudents.some(e => e.studentId === log.studentId);
-        if (!isEnrolled) return c;
-
-        if (!autoMarkedClassTitle) {
-          autoMarkedClassTitle = c.title;
-        }
-
-        return {
-          ...c,
-          enrolledStudents: c.enrolledStudents.map(e => {
-            if (e.studentId === log.studentId) {
-              return {
-                ...e,
-                checkedIn: true,
-                status: 'presente',
-                checkInTime: timeStr,
-                checkInSource: 'catraca'
-              };
-            }
-            return e;
-          })
-        };
-      }));
-
-      if (autoMarkedClassTitle && agendaSettings.notificarPresencaCatraca) {
-        showToast(`Presença de ${log.studentName} confirmada na aula "${autoMarkedClassTitle}" via Catraca!`);
-        dispatchPushNotification({
-          title: 'Presença Automática via Catraca',
-          message: `${log.studentName} teve sua presença confirmada na aula "${autoMarkedClassTitle}" ao liberar a catraca.`,
-          type: 'success',
-          module: 'agenda',
-          eventType: 'catraca_presenca_auto',
-          linkTab: 'agenda',
-          actionLabel: 'Ver Grade'
-        });
-      }
-    }
-
-    showToast(log.status === 'liberado' ? 'Acesso Liberado!' : 'Acesso Bloqueado pela Catraca!');
-    dispatchPushNotification({
-      title: log.status === 'liberado' ? 'Catraca: Entrada Liberada' : 'Catraca: Entrada Bloqueada',
-      message: `${log.studentName} - ${log.reason || (log.status === 'liberado' ? 'Acesso autorizado' : 'Acesso bloqueado')}.`,
-      type: log.status === 'liberado' ? 'success' : 'error',
-      module: 'catraca',
-      eventType: log.status === 'liberado' ? 'catraca_liberada' : 'catraca_bloqueada',
-      linkTab: 'catraca',
-      actionLabel: 'Ver Catraca'
-    });
-  };
 
   const handleUpdateLeadStage = (leadId: string, newStage: LeadStage) => {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: newStage, lastContact: 'Hoje' } : l));
@@ -942,7 +953,6 @@ export default function App() {
     setTransactions(INITIAL_TRANSACTIONS);
     setClasses(INITIAL_CLASSES);
     setWorkouts(INITIAL_WORKOUTS);
-    setAccessLogs(INITIAL_ACCESS_LOGS);
     setLeads(INITIAL_LEADS);
     setComandas(INITIAL_COMANDAS);
     setStockMovements(INITIAL_STOCK_MOVEMENTS);
@@ -1006,69 +1016,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Sidebar - Matching screenshot tabs com rolagem isolada */}
-      <Sidebar
-        currentTab={currentTab}
-        onTabChange={(tab) => handleNavigateTab(tab)}
-        dashboardSubTab={dashboardSubTab}
-        onDashboardSubTabChange={(sub) => {
-          setDashboardSubTab(sub);
-          handleNavigateTab('dashboards');
-        }}
-        professoresSubTab={professoresSubTab}
-        onProfessoresSubTabChange={(sub) => {
-          setProfessoresSubTab(sub);
-          handleNavigateTab('professores');
-        }}
-        crmSubTab={crmSubTab}
-        onCrmSubTabChange={(sub) => {
-          setCrmSubTab(sub);
-          handleNavigateTab('crm');
-        }}
-        agendaSubTab={agendaSubTab}
-        onAgendaSubTabChange={(sub) => {
-          setAgendaSubTab(sub);
-          handleNavigateTab('agenda');
-        }}
-        treinoSubTab={treinoSubTab}
-        onTreinoSubTabChange={(sub) => {
-          setTreinoSubTab(sub);
-          handleNavigateTab('treino');
-        }}
-        avaliacoesSubTab={avaliacoesSubTab}
-        onAvaliacoesSubTabChange={(sub) => {
-          setAvaliacoesSubTab(sub);
-          handleNavigateTab('avaliacoes');
-        }}
-        nutricaoSubTab={nutricaoSubTab}
-        onNutricaoSubTabChange={(sub) => {
-          setNutricaoSubTab(sub);
-          handleNavigateTab('nutricao');
-        }}
-        bemEstarSubTab={bemEstarSubTab}
-        onBemEstarSubTabChange={(sub) => {
-          setBemEstarSubTab(sub);
-          handleNavigateTab('bem_estar');
-        }}
-        whatsappSubTab={whatsappSubTab}
-        onWhatsappSubTabChange={(sub) => {
-          setWhatsappSubTab(sub);
-          handleNavigateTab('whatsapp');
-        }}
-        financeiroSubTab={financeiroSubTab}
-        onFinanceiroSubTabChange={(sub) => {
-          setFinanceiroSubTab(sub);
-          handleNavigateTab('financeiro');
-        }}
-        isOpenMobile={isMobileSidebarOpen}
-        onCloseMobile={() => setIsMobileSidebarOpen(false)}
-        overdueCount={overdueCount}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
-        currentUser={currentUser}
-      />
-
-      {/* Main Content Area - Coluna central com cabeçalho fixo e rolagem isolada */}
+      {/* Main Content Area - Coluna central com cabeçalho fixo, navegação superior e rolagem isolada */}
       <div className="flex-1 flex flex-col min-w-0 h-screen max-h-screen overflow-hidden">
         {/* Floating Real-Time Push Notification Container */}
         <PushNotificationContainer onNavigateTab={(tab) => handleNavigateTab(tab)} />
@@ -1077,25 +1025,85 @@ export default function App() {
         <Header
           onOpenNewStudent={() => setIsNewStudentModalOpen(true)}
           onOpenQuickSale={() => handleNavigateTab('vendas')}
-          onOpenTurnstile={() => handleNavigateTab('catraca')}
           onOpenNewOpportunity={() => {
             setCrmSubTab('leads');
             handleNavigateTab('crm');
           }}
           onSelectStudent={(student) => setSelectedStudentForSheet(student)}
           students={students}
-          onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleCollapseSidebar={() => setIsSidebarCollapsed(prev => !prev)}
           onLogout={handleLogout}
           currentUser={currentUser}
           onNavigateTab={(tab) => handleNavigateTab(tab)}
         />
 
+        {/* TopNav - Menu Superior em Pílulas com Sub-abas Retráteis (Design Clean) */}
+        <TopNav
+          currentTab={currentTab}
+          onTabChange={(tab) => handleNavigateTab(tab)}
+          dashboardSubTab={dashboardSubTab}
+          onDashboardSubTabChange={(sub) => {
+            setDashboardSubTab(sub);
+            handleNavigateTab('dashboards');
+          }}
+          professoresSubTab={professoresSubTab}
+          onProfessoresSubTabChange={(sub) => {
+            setProfessoresSubTab(sub);
+            handleNavigateTab('professores');
+          }}
+          crmSubTab={crmSubTab}
+          onCrmSubTabChange={(sub) => {
+            setCrmSubTab(sub);
+            handleNavigateTab('crm');
+          }}
+          agendaSubTab={agendaSubTab}
+          onAgendaSubTabChange={(sub) => {
+            setAgendaSubTab(sub);
+            handleNavigateTab('agenda');
+          }}
+          treinoSubTab={treinoSubTab}
+          onTreinoSubTabChange={(sub) => {
+            setTreinoSubTab(sub);
+            handleNavigateTab('treino');
+          }}
+          avaliacoesSubTab={avaliacoesSubTab}
+          onAvaliacoesSubTabChange={(sub) => {
+            setAvaliacoesSubTab(sub);
+            handleNavigateTab('avaliacoes');
+          }}
+          nutricaoSubTab={nutricaoSubTab}
+          onNutricaoSubTabChange={(sub) => {
+            setNutricaoSubTab(sub);
+            handleNavigateTab('nutricao');
+          }}
+          bemEstarSubTab={bemEstarSubTab}
+          onBemEstarSubTabChange={(sub) => {
+            setBemEstarSubTab(sub);
+            handleNavigateTab('bem_estar');
+          }}
+          whatsappSubTab={whatsappSubTab}
+          onWhatsappSubTabChange={(sub) => {
+            setWhatsappSubTab(sub);
+            handleNavigateTab('whatsapp');
+          }}
+          financeiroSubTab={financeiroSubTab}
+          onFinanceiroSubTabChange={(sub) => {
+            setFinanceiroSubTab(sub);
+            handleNavigateTab('financeiro');
+          }}
+          empresasClientesSubTab={empresasClientesSubTab}
+          onEmpresasClientesSubTabChange={(sub) => {
+            setEmpresasClientesSubTab(sub);
+            handleNavigateTab('empresas_clientes');
+          }}
+          overdueCount={overdueCount}
+          leadsCount={leads.length}
+          currentUser={currentUser}
+        />
+
         {/* Scroll Container Isolado da Página Central */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden custom-main-scrollbar flex flex-col">
-          {/* Tab Router Content */}
-          <main className="flex-1 p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto">
+          {/* Tab Router Content (Largura Total 100%) */}
+          <main className="flex-1 p-3 sm:p-5 md:p-6 w-full min-w-0">
           {!hasTabPermission(currentTab, currentUser) ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-6 sm:p-10 text-center max-w-xl mx-auto my-8 sm:my-14 shadow-xs animate-in fade-in duration-200">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 shadow-inner mb-4">
@@ -1139,16 +1147,21 @@ export default function App() {
             </div>
           ) : (
             <div key={currentTab} className="animate-tab-fade-in">
-              {/* Tab 1: Início (Home view from screenshot) */}
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center min-h-[300px] text-slate-500 font-medium text-xs">
+                    Carregando módulo…
+                  </div>
+                }
+              >
+                {/* Tab 1: Início (Home view from screenshot) */}
               {currentTab === 'inicio' && (
                 <InicioTab
                   students={students}
-                  accessLogs={accessLogs}
                   transactions={transactions}
                   onNavigateToTab={(tab) => handleNavigateTab(tab as TabType)}
                   onOpenNewStudent={() => setIsNewStudentModalOpen(true)}
                   onOpenQuickSale={() => handleNavigateTab('vendas')}
-                  onOpenTurnstile={() => handleNavigateTab('catraca')}
                   onOpenNewOpportunity={() => {
                     setCrmSubTab('leads');
                     handleNavigateTab('crm');
@@ -1163,7 +1176,6 @@ export default function App() {
             <DashboardsTab
               students={students}
               transactions={transactions}
-              accessLogs={accessLogs}
               leads={leads}
               classes={classes}
               workouts={workouts}
@@ -1173,16 +1185,18 @@ export default function App() {
             />
           )}
 
-          {/* Tab 3: Clientes (Lista e Gestão de Alunos) */}
+          {/* Tab 3: Clientes (Lista e Gestão de Alunos com Ficha Central 360°) */}
           {(currentTab === 'clientes' || (currentTab as string) === 'alunos') && (
             <AlunosTab
               students={students}
               onOpenNewStudent={() => setIsNewStudentModalOpen(true)}
-              onSelectStudent={(student) => setSelectedStudentForSheet(student)}
-              onTestTurnstile={(student) => {
-                setStudentToTestInTurnstile(student);
-                setCurrentTab('catraca');
-              }}
+              transactions={transactions}
+              workouts={workouts}
+              onUpdateStudentStatus={handleUpdateStudentStatus}
+              onSettleStudentPayment={handleSettleStudentPayment}
+              onNavigateToTab={(tab) => setCurrentTab(tab as TabType)}
+              onUpdateStudent={handleUpdateStudent}
+              onAddSaleTransaction={handleAddSaleTransaction}
             />
           )}
 
@@ -1403,22 +1417,19 @@ export default function App() {
             <RelatoriosTab
               students={students}
               transactions={transactions}
-              accessLogs={accessLogs}
             />
           )}
 
-          {/* Tab 12: Catraca (Simulador e Monitoramento em Tempo Real) */}
-          {currentTab === 'catraca' && (
-            <CatracaTab
-              students={students}
-              classes={classes}
-              accessLogs={accessLogs}
-              onRegisterAccess={handleRegisterAccess}
-              selectedStudentToTest={studentToTestInTurnstile}
-              onOpenConfiguracoes={() => {
-                setConfiguracoesSubTab('catraca');
-                setCurrentTab('configuracoes');
-              }}
+
+          {/* Tab: Empresas Clientes (B2B SaaS) */}
+          {currentTab === 'empresas_clientes' && (
+            <EmpresasClientesTab
+              subTab={empresasClientesSubTab}
+              onSubTabChange={setEmpresasClientesSubTab}
+              empresas={empresasClientes}
+              onAddEmpresa={handleAddEmpresa}
+              onUpdateEmpresa={handleUpdateEmpresa}
+              onDeleteEmpresa={handleDeleteEmpresa}
             />
           )}
 
@@ -1433,7 +1444,6 @@ export default function App() {
               classes={classes}
               products={products}
               comandas={comandas}
-              accessLogs={accessLogs}
               recurringCharges={recurringCharges}
               paymentLinks={paymentLinks}
               onSaveSettings={(newSettings) => {
@@ -1519,6 +1529,7 @@ export default function App() {
               onCompleteSale={handleCompleteSale}
             />
           )}
+              </Suspense>
             </div>
           )}
         </main>
@@ -1536,20 +1547,6 @@ export default function App() {
         onAddStudent={handleAddStudent}
       />
 
-      <FichaAlunoModal
-        student={selectedStudentForSheet}
-        isOpen={!!selectedStudentForSheet}
-        onClose={() => setSelectedStudentForSheet(null)}
-        transactions={transactions}
-        workouts={workouts}
-        accessLogs={accessLogs}
-        onUpdateStudentStatus={handleUpdateStudentStatus}
-        onTestTurnstile={(student) => {
-          setStudentToTestInTurnstile(student);
-          setCurrentTab('catraca');
-        }}
-        onSettleStudentPayment={handleSettleStudentPayment}
-      />
 
       {/* Modal de Configurações Rápidas da Aba / Sub-Aba Ativa */}
       <TabConfigModal
@@ -1561,7 +1558,7 @@ export default function App() {
           setIsTabConfigModalOpen(false);
           const mappedSub: ConfigSubTab = 
             currentTab === 'inicio' ? 'geral' :
-            currentTab === 'alunos' ? 'clientes' :
+            currentTab === 'clientes' ? 'clientes' :
             (currentTab as ConfigSubTab);
           setConfiguracoesSubTab(mappedSub || 'geral');
           handleNavigateTab('configuracoes');

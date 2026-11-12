@@ -9,7 +9,8 @@ import {
   DocumentData,
   Unsubscribe
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, testConnection } from '../lib/firebase';
+import { db, auth, handleFirestoreError, OperationType, testConnection } from '../lib/firebase';
+export { db, auth };
 
 export interface DatabaseStatus {
   connected: boolean;
@@ -270,7 +271,6 @@ export async function syncAllSystemDataToCloud(customData?: Record<string, any[]
       financial_transactions: 'vbsport_transactions',
       classes: 'vbsport_classes',
       workouts: 'vbsport_workouts',
-      access_logs: 'vbsport_access_logs',
       leads: 'vbsport_leads',
       products: 'vbsport_products',
       comandas: 'vbsport_comandas',
