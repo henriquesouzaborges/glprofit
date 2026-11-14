@@ -15,12 +15,44 @@ export interface SystemVersionInfo {
 }
 
 export const SYSTEM_VERSION_INFO: SystemVersionInfo = {
-  version: 'v2.5.3',
+  version: 'v2.6.2',
   versionName: 'GL PRO FIT Enterprise Suite',
-  releaseDate: '12 de Novembro de 2026',
-  buildNumber: '20261112.01',
+  releaseDate: '13 de Novembro de 2026',
+  buildNumber: '20261113.03',
   status: 'stable',
   changelog: [
+    {
+      version: 'v2.6.2',
+      date: '13/11/2026',
+      description: 'Correção e inclusão do campo de logomarca da empresa cliente no modal de cadastro e edição de empresas parceiras (B2B).',
+      highlights: [
+        'Campo de Logomarca Integrado: Adicionado campo "URL da Logomarca do Cliente" no modal de nova empresa cliente e edição na aba Empresas Clientes',
+        'Persistência e Sincronização: O campo `logoUrl` é salvo corretamente e integrado com o estado e salvamento no Firestore'
+      ]
+    },
+    {
+      version: 'v2.6.1',
+      date: '13/11/2026',
+      description: 'Refinamentos de front-end e identidade institucional: cabeçalho limpo com fundo branco, espaço para logomarca do cliente, padronização da aba Início, remoção de botões rápidos redundantes e nova descrição profissional para performance, análise e controle.',
+      highlights: [
+        'Cabeçalho Limpo com Fundo Branco (bg-white): Logomarca oficial GL PRO FIT lado a lado com o espaço reservado para a logomarca do cliente ("logomarca do cliente aqui")',
+        'Remoção de Badge de Versão do Cabeçalho: Versão do sistema transferida exclusivamente para o rodapé conforme solicitação',
+        'Padronização da Aba Início: Card do administrador master alinhado ao padrão clean dos demais cards e remoção dos botões rápidos (Nova Oportunidade, Novo Cliente, Nova Venda)',
+        'Slogan Institucional Atualizado: Alterado para "Sistema de Gestão Profissional para Performance, Análise e Controle"',
+        'Suporte a Logomarca na Empresa Cliente: Adicionado campo para upload/URL de logomarca no cadastro e edição de empresas clientes (B2B)'
+      ]
+    },
+    {
+      version: 'v2.6.0',
+      date: '13/11/2026',
+      description: 'Auditoria arquitetural completa, refatoração e sincronização total de dados entre todos os 19+ módulos com o Firestore, eliminando dados fictícios em Dashboards, Relatórios, Estoque, Tarefas e Pesquisas.',
+      highlights: [
+        'Sincronização Total com Firestore: Conexão unificada e em tempo real em todos os 19+ módulos sob a Única Fonte de Verdade',
+        'Zerar Dados Fictícios em Relatórios e Dashboards: DRE, demonstrativos e sub-abas de BI calculados puramente a partir de transações e alunos reais',
+        'Limpeza de Tarefas e Estoque: Expurgo de tarefas e professores de demonstração no módulo de tarefas, além de estoque inicial limpo',
+        'Blindagem de Erros (*Defensive Programming*): Proteção contra nulos e tratamento de exceções em agendas de professores e componentes globais'
+      ]
+    },
     {
       version: 'v2.5.3',
       date: '12/11/2026',

@@ -85,7 +85,8 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
     monthlyValue: 890.00,
     maxUsers: 25,
     dueDate: new Date().toISOString().slice(0, 10),
-    notes: ''
+    notes: '',
+    logoUrl: ''
   });
 
   const handleOpenNew = () => {
@@ -99,7 +100,8 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
       monthlyValue: 890.00,
       maxUsers: 25,
       dueDate: new Date().toISOString().slice(0, 10),
-      notes: ''
+      notes: '',
+      logoUrl: ''
     });
     setEditingEmpresa(null);
     setShowNewModal(true);
@@ -117,7 +119,8 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
       monthlyValue: emp.monthlyValue,
       maxUsers: emp.maxUsers,
       dueDate: emp.dueDate,
-      notes: emp.notes || ''
+      notes: emp.notes || '',
+      logoUrl: emp.logoUrl || ''
     });
     setShowNewModal(true);
   };
@@ -136,7 +139,8 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
         monthlyValue: Number(formData.monthlyValue) || 0,
         maxUsers: Number(formData.maxUsers) || 10,
         dueDate: formData.dueDate,
-        notes: formData.notes
+        notes: formData.notes,
+        logoUrl: formData.logoUrl
       };
       onUpdateEmpresa(updated);
       showToast(`Empresa "${updated.name}" atualizada com sucesso!`);
@@ -155,7 +159,8 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
         activatedAt: new Date().toISOString().slice(0, 10),
         allowedModules: ['inicio', 'clientes', 'agenda', 'financeiro', 'treino', 'relatorios'],
         maxUsers: Number(formData.maxUsers) || 25,
-        notes: formData.notes
+        notes: formData.notes,
+        logoUrl: formData.logoUrl
       };
       onAddEmpresa(newEmp);
       showToast(`Empresa "${newEmp.name}" cadastrada com sucesso!`);
@@ -577,6 +582,17 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
                     className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">URL da Logomarca do Cliente</label>
+                <input
+                  type="url"
+                  value={formData.logoUrl}
+                  onChange={(e) => setFormData(prev => ({ ...prev, logoUrl: e.target.value }))}
+                  placeholder="https://exemplo.com/logo.png"
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
               </div>
 
               <div>

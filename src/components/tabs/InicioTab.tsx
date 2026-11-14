@@ -145,22 +145,22 @@ export const InicioTab: React.FC<InicioTabProps> = ({
       
       {/* 1. BARRA EXCLUSIVA DO ADMINISTRADOR: GESTÃO DE LICENÇAS DE ESCOLAS PARCEIRAS */}
       {isAdmin && (
-        <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50/50 to-slate-50 p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-2xs shrink-0">
-              <ShieldCheck className="w-5 h-5" />
+            <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 shadow-2xs shrink-0">
+              <ShieldCheck className="w-5 h-5 text-blue-600" />
             </div>
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-blue-950">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-900">
                   Painel do Administrador Master
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                   Acesso Ilimitado
                 </span>
               </div>
-              <p className="text-xs text-slate-600">
-                Seu perfil não possui aviso de vencimento. Gerencie as licenças, datas de renovação e avisos das <strong>{licenses.length} escolas parceiras terceirizadas</strong>.
+              <p className="text-xs text-slate-500">
+                Gerencie licenças, datas de renovação e avisos das <strong>{licenses.length} escolas parceiras</strong>.
               </p>
             </div>
           </div>
@@ -170,7 +170,7 @@ export const InicioTab: React.FC<InicioTabProps> = ({
               <button
                 type="button"
                 onClick={() => setPreviewSchoolId(null)}
-                className="px-3 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer hover:bg-slate-800"
+                className="px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer hover:bg-slate-50"
                 title="Encerrar pré-visualização de escola parceira"
               >
                 <EyeOff className="w-3.5 h-3.5" />
@@ -181,10 +181,10 @@ export const InicioTab: React.FC<InicioTabProps> = ({
             <button
               type="button"
               onClick={() => setShowLicenseModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1.5 shadow-xs hover:bg-slate-50 transition-colors cursor-pointer"
             >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>Gerenciar Escolas Parceiras</span>
+              <Building2 className="w-3.5 h-3.5 text-blue-600" />
+              <span>Gerenciar Escolas</span>
             </button>
           </div>
         </div>
@@ -250,43 +250,11 @@ export const InicioTab: React.FC<InicioTabProps> = ({
         </div>
       )}
 
-      {/* 3. SAUDAÇÃO & AÇÕES RÁPIDAS */}
-      <div className="sticky top-0 z-10 -mx-3 -mt-3 sm:-mx-5 sm:-mt-5 md:-mx-6 md:-mt-6 px-3 sm:px-5 md:px-6 py-2.5 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs mb-2">
+      {/* 3. SAUDAÇÃO */}
+      <div className="sticky top-0 z-10 -mx-3 -mt-3 sm:-mx-5 sm:-mt-5 md:-mx-6 md:-mt-6 px-3 sm:px-5 md:px-6 py-2.5 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200/80 flex items-center justify-between gap-3 shadow-2xs mb-2">
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
           Bom dia, {greetingName}.
         </h1>
-
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-bold">
-          {canAccessCrm && (
-            <button
-              onClick={onOpenNewOpportunity}
-              className="flex items-center gap-1.5 text-amber-600 hover:text-amber-700 transition-colors uppercase tracking-wide hover:underline cursor-pointer"
-            >
-              <Lightbulb className="h-4 w-4" />
-              NOVA OPORTUNIDADE
-            </button>
-          )}
-
-          {canAccessAlunos && (
-            <button
-              onClick={onOpenNewStudent}
-              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-wide hover:underline cursor-pointer"
-            >
-              <UserPlus className="h-4 w-4" />
-              NOVO CLIENTE
-            </button>
-          )}
-
-          {canAccessVendas && (
-            <button
-              onClick={onOpenQuickSale}
-              className="flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 transition-colors uppercase tracking-wide hover:underline cursor-pointer"
-            >
-              <DollarSign className="h-4 w-4" />
-              NOVA VENDA
-            </button>
-          )}
-        </div>
       </div>
 
       {/* 4. GRID PRINCIPAL: CARDS COM NÚMEROS REAIS & NOTIFICAÇÕES */}

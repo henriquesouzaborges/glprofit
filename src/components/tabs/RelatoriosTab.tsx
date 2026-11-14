@@ -38,7 +38,9 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
 
   const totalRevenue = transactions.filter(t => t.type === 'receita' && t.status === 'pago').reduce((acc, t) => acc + t.amount, 0);
   const totalExpenses = transactions.filter(t => t.type === 'despesa' && t.status === 'pago').reduce((acc, t) => acc + t.amount, 0);
-  const netProfit = totalRevenue - totalExpenses;
+  const deductions = totalRevenue * 0.03;
+  const netProfit = totalRevenue - deductions - totalExpenses;
+  const netMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
 
   const handleExportCSV = () => {
     alert("Relatório exportado em formato CSV/Excel com sucesso!");
@@ -160,7 +162,7 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
               <div className="mt-2 text-2xl font-bold text-slate-900 font-mono">
                 {formatCurrency(netProfit)}
               </div>
-              <div className="mt-1 text-[11px] text-emerald-600 font-medium">Margem líquida: 66%</div>
+              <div className="mt-1 text-[11px] text-emerald-600 font-medium">Margem líquida: {netMargin}%</div>
             </div>
           </div>
 
@@ -171,23 +173,23 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
             <div className="space-y-2 text-xs divide-y divide-slate-100">
               <div className="flex justify-between py-1.5 font-bold text-slate-900">
                 <span>(+) RECEITA BRUTA COM PLANOS E MENSALIDADES</span>
-                <span className="font-mono text-emerald-600">R$ 51.480,00</span>
+                <span className="font-mono text-emerald-600">{formatCurrency(totalRevenue)}</span>
               </div>
               <div className="flex justify-between py-1.5 text-slate-600">
                 <span className="pl-4">Receita com Vendas no Balcão & Comandas</span>
-                <span className="font-mono text-emerald-600">R$ 3.410,00</span>
+                <span className="font-mono text-emerald-600">{formatCurrency(totalRevenue * 0.1)}</span>
               </div>
               <div className="flex justify-between py-1.5 font-bold text-slate-900">
                 <span>(-) DEDUÇÕES E TAXAS DE CARTÃO (GL PROFIT PAY)</span>
-                <span className="font-mono text-rose-600">- R$ 1.120,00</span>
+                <span className="font-mono text-rose-600">- {formatCurrency(deductions)}</span>
               </div>
               <div className="flex justify-between py-1.5 font-bold text-slate-900">
                 <span>(-) DESPESAS FIXAS E OPERACIONAIS</span>
-                <span className="font-mono text-rose-600">- R$ 16.400,00</span>
+                <span className="font-mono text-rose-600">- {formatCurrency(totalExpenses)}</span>
               </div>
               <div className="flex justify-between py-2 font-black text-sm text-slate-900 bg-slate-50 px-3 rounded-lg">
                 <span>LUCRO LÍQUIDO DO PERÍODO</span>
-                <span className="font-mono text-emerald-700">R$ 37.370,00</span>
+                <span className="font-mono text-emerald-700">{formatCurrency(netProfit)}</span>
               </div>
             </div>
           </div>

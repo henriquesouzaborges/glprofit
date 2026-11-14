@@ -783,6 +783,7 @@ export interface EmpresaCliente {
   allowedModules: TabType[];
   maxUsers: number;
   notes?: string;
+  logoUrl?: string;
 }
 
 export type TabType = 
