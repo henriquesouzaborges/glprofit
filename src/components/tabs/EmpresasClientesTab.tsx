@@ -19,10 +19,13 @@ import {
   Edit3, 
   Trash2, 
   Activity,
-  Layers
+  Layers,
+  Mail,
+  Link2
 } from 'lucide-react';
-import { EmpresaCliente, EmpresasClientesSubTab, TabType } from '../../types';
+import { EmpresaCliente, EmpresasClientesSubTab, LinkedStudentInfo, Plan, Student, SystemUser, TabType } from '../../types';
 import { formatCurrency, formatDate } from '../../utils';
+import { EnviarLinkCadastroModal } from '../modals/EnviarLinkCadastroModal';
 
 interface EmpresasClientesTabProps {
   subTab: EmpresasClientesSubTab;
@@ -31,6 +34,10 @@ interface EmpresasClientesTabProps {
   onAddEmpresa: (empresa: EmpresaCliente) => void;
   onUpdateEmpresa: (empresa: EmpresaCliente) => void;
   onDeleteEmpresa: (id: string) => void;
+  students?: Student[];
+  plans?: Plan[];
+  currentUser?: SystemUser | null;
+  onOpenCadastroPreview?: (url: string) => void;
 }
 
 const ALL_MODULES: { id: TabType; label: string; category: string }[] = [
@@ -61,13 +68,43 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
   empresas,
   onAddEmpresa,
   onUpdateEmpresa,
-  onDeleteEmpresa
+  onDeleteEmpresa,
+  students = [],
+  plans = [],
+  currentUser,
+  onOpenCadastroPreview
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
   const [editingEmpresa, setEditingEmpresa] = useState<EmpresaCliente | null>(null);
   const [managingModulesEmpresa, setManagingModulesEmpresa] = useState<EmpresaCliente | null>(null);
+  const [viewingLinkedEmpresa, setViewingLinkedEmpresa] = useState<EmpresaCliente | null>(null);
+  const [inviteEmpresaId, setInviteEmpresaId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const getLinkedStudentsForEmpresa = (emp: EmpresaCliente): LinkedStudentInfo[] => {
+    const map = new Map<string, LinkedStudentInfo>();
+    (emp.linkedStudents || []).forEach(item => {
+      map.set(item.userId || item.email.toLowerCase(), item);
+    });
+    students
+      .filter(s => s.empresaId === emp.id)
+      .forEach(s => {
+        const key = s.registeredUserId || s.email?.toLowerCase() || s.id;
+        if (!map.has(key)) {
+          map.set(key, {
+            userId: s.registeredUserId || s.id,
+            studentId: s.id,
+            email: s.email,
+            name: s.name,
+            registeredAt: s.startDate || '',
+            inviteId: s.inviteToken
+          });
+        }
+      });
+    return Array.from(map.values());
+  };
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -81,9 +118,9 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
     ownerName: '',
     email: '',
     phone: '',
-    planName: 'Plano Pro Box',
-    monthlyValue: 890.00,
-    maxUsers: 25,
+    planName: '',
+    monthlyValue: 0,
+    maxUsers: 10,
     dueDate: new Date().toISOString().slice(0, 10),
     notes: '',
     logoUrl: ''
@@ -96,9 +133,9 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
       ownerName: '',
       email: '',
       phone: '',
-      planName: 'Plano Pro Box',
-      monthlyValue: 890.00,
-      maxUsers: 25,
+      planName: '',
+      monthlyValue: 0,
+      maxUsers: 10,
       dueDate: new Date().toISOString().slice(0, 10),
       notes: '',
       logoUrl: ''
@@ -331,32 +368,54 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {empresas.map((emp) => (
-                    <tr key={emp.id} className="hover:bg-slate-50/60">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">{emp.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">CNPJ: {emp.cnpj} • Resp: {emp.ownerName}</div>
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-slate-700">{emp.planName}</td>
-                      <td className="py-3 px-4 font-bold text-emerald-600">{formatCurrency(emp.monthlyValue)}</td>
-                      <td className="py-3 px-4 font-mono">{emp.maxUsers} usuários</td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold">
-                          {emp.allowedModules?.length || 0} de {ALL_MODULES.length} módulos
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          emp.status === 'ativo'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-rose-50 text-rose-700 border border-rose-200'
-                        }`}>
-                          {emp.status === 'ativo' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          {emp.status}
-                        </span>
+                  {empresas.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 px-4 text-center">
+                        <div className="max-w-md mx-auto space-y-2.5">
+                          <Building2 className="w-8 h-8 text-slate-300 mx-auto" />
+                          <div className="text-sm font-bold text-slate-700">Nenhuma empresa cliente cadastrada</div>
+                          <p className="text-xs text-slate-500">
+                            Os contratos B2B cadastrados serão sincronizados em tempo real com o Firestore.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleOpenNew}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Cadastrar Primeira Empresa</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    empresas.map((emp) => (
+                      <tr key={emp.id} className="hover:bg-slate-50/60">
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900">{emp.name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">CNPJ: {emp.cnpj} • Resp: {emp.ownerName}</div>
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-slate-700">{emp.planName}</td>
+                        <td className="py-3 px-4 font-bold text-emerald-600">{formatCurrency(emp.monthlyValue)}</td>
+                        <td className="py-3 px-4 font-mono">{emp.maxUsers} usuários</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold">
+                            {emp.allowedModules?.length || 0} de {ALL_MODULES.length} módulos
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            emp.status === 'ativo'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}>
+                            {emp.status === 'ativo' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            {emp.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -387,86 +446,184 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
           </div>
 
           {/* Cards de Empresas Clientes */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredEmpresas.map((emp) => (
-              <div key={emp.id} className="rounded-3xl bg-white border border-slate-200 shadow-xs p-6 space-y-4 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900">{emp.name}</h3>
-                      <p className="text-xs text-slate-400 font-mono">CNPJ: {emp.cnpj}</p>
-                    </div>
-
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold uppercase ${
-                      emp.status === 'ativo'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-rose-50 text-rose-700 border border-rose-200'
-                    }`}>
-                      {emp.status === 'ativo' ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                      {emp.status}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Responsável</span>
-                      <strong className="text-slate-800">{emp.ownerName}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Contato</span>
-                      <span className="text-slate-700">{emp.phone}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Plano SaaS</span>
-                      <strong className="text-blue-700">{emp.planName}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Valor / Licenças</span>
-                      <strong className="text-emerald-600">{formatCurrency(emp.monthlyValue)} ({emp.maxUsers} usuais)</strong>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-slate-600 flex items-center justify-between pt-1">
-                    <span>Módulos Contratados e Liberados:</span>
-                    <strong className="text-blue-700">{emp.allowedModules?.length || 0} de {ALL_MODULES.length} ativados</strong>
-                  </div>
-                </div>
-
-                {/* Botões de Ação do Card */}
-                <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                  <button
-                    onClick={() => setManagingModulesEmpresa(emp)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 cursor-pointer transition-colors"
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                    <span>Configurar Módulos & Funcionalidades</span>
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggleEmpresaStatus(emp)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
-                        emp.status === 'ativo'
-                          ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-                          : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs'
-                      }`}
-                      title={emp.status === 'ativo' ? 'Bloquear Acesso da Empresa' : 'Ativar Acesso da Empresa'}
-                    >
-                      {emp.status === 'ativo' ? 'Bloquear' : 'Ativar Acesso'}
-                    </button>
-
-                    <button
-                      onClick={() => handleOpenEdit(emp)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
-                      title="Editar Dados do Contrato"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+          {filteredEmpresas.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center space-y-3">
+              <Building2 className="w-10 h-10 text-slate-300 mx-auto" />
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {empresas.length === 0 ? 'Nenhuma empresa cliente cadastrada' : 'Nenhuma empresa encontrada para a busca'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {empresas.length === 0
+                    ? 'Cadastre a primeira academia ou empresa parceira para gerenciar acessos, módulos e cobranças SaaS.'
+                    : 'Tente outro termo de pesquisa por nome, CNPJ ou responsável.'}
+                </p>
               </div>
-            ))}
-          </div>
+              {empresas.length === 0 && (
+                <button
+                  type="button"
+                  onClick={handleOpenNew}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nova Empresa Cliente</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredEmpresas.map((emp) => (
+                <div key={emp.id} className="rounded-3xl bg-white border border-slate-200 shadow-xs p-6 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900">{emp.name}</h3>
+                        <p className="text-xs text-slate-400 font-mono">CNPJ: {emp.cnpj}</p>
+                      </div>
+
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold uppercase ${
+                        emp.status === 'ativo'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}>
+                        {emp.status === 'ativo' ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                        {emp.status}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Responsável</span>
+                        <strong className="text-slate-800">{emp.ownerName}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Contato</span>
+                        <span className="text-slate-700">{emp.phone}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Plano SaaS</span>
+                        <strong className="text-blue-700">{emp.planName}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Valor / Licenças</span>
+                        <strong className="text-emerald-600">{formatCurrency(emp.monthlyValue)} ({emp.maxUsers} usuais)</strong>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-slate-600 flex items-center justify-between pt-1">
+                      <span>Módulos Contratados e Liberados:</span>
+                      <strong className="text-blue-700">{emp.allowedModules?.length || 0} de {ALL_MODULES.length} ativados</strong>
+                    </div>
+
+                    {(() => {
+                      const linked = getLinkedStudentsForEmpresa(emp);
+                      return (
+                        <div className="flex items-center justify-between rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-3 py-2 text-xs">
+                          <span className="text-emerald-900 font-semibold flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{linked.length} {linked.length === 1 ? 'aluno vinculado' : 'alunos vinculados'}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setViewingLinkedEmpresa(emp)}
+                            className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                          >
+                            Ver e-mails & IDs
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Botões de Ação do Card */}
+                  <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => setManagingModulesEmpresa(emp)}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 cursor-pointer transition-colors"
+                      >
+                        <Sliders className="w-3.5 h-3.5" />
+                        <span>Configurar Módulos & Funcionalidades</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setInviteEmpresaId(emp.id)}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 cursor-pointer transition-colors"
+                        title="Gerar link de cadastro de aluno vinculado automaticamente a esta empresa"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        <span>Link de Cadastro (Aluno)</span>
+                      </button>
+
+                      <button
+                        onClick={() => showToast(`E-mail de primeiro acesso enviado com sucesso para ${emp.email}! A empresa ${emp.name} receberá o link para configurar o primeiro acesso.`)}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 cursor-pointer transition-colors"
+                        title="Enviar e-mail para configurar o primeiro acesso da empresa cliente"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>Enviar Acesso por E-mail</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleEmpresaStatus(emp)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                          emp.status === 'ativo'
+                            ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                            : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs'
+                        }`}
+                        title={emp.status === 'ativo' ? 'Bloquear Acesso da Empresa' : 'Ativar Acesso da Empresa'}
+                      >
+                        {emp.status === 'ativo' ? 'Bloquear' : 'Ativar Acesso'}
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenEdit(emp)}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                        title="Editar Dados do Contrato"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+
+                      {confirmDeleteId === emp.id ? (
+                        <div className="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-xl px-2 py-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDeleteEmpresa(emp.id);
+                              setConfirmDeleteId(null);
+                              showToast(`Empresa "${emp.name}" excluída com sucesso!`);
+                            }}
+                            className="text-[11px] font-bold text-rose-700 hover:underline cursor-pointer px-1"
+                          >
+                            Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 cursor-pointer px-1"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(emp.id)}
+                          className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold cursor-pointer transition-colors"
+                          title="Excluir Empresa Cliente"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -558,6 +715,7 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
                     type="text"
                     value={formData.planName}
                     onChange={(e) => setFormData(prev => ({ ...prev, planName: e.target.value }))}
+                    placeholder="Ex: Plano Enterprise"
                     className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
@@ -726,6 +884,130 @@ export const EmpresasClientesTab: React.FC<EmpresasClientesTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL: ALUNOS VINCULADOS À EMPRESA (E-MAIL + USER ID) */}
+      {viewingLinkedEmpresa && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setViewingLinkedEmpresa(null);
+          }}
+        >
+          <div className="w-full max-w-2xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-emerald-600" />
+                  <span>Alunos Vinculados — {viewingLinkedEmpresa.name}</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  E-mails e IDs de usuários registrados automaticamente via link de cadastro desta empresa
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingLinkedEmpresa(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 max-h-[65vh] overflow-y-auto">
+              {(() => {
+                const linkedList = getLinkedStudentsForEmpresa(viewingLinkedEmpresa);
+                if (linkedList.length === 0) {
+                  return (
+                    <div className="text-center py-8 space-y-3">
+                      <Users className="w-9 h-9 text-slate-300 mx-auto" />
+                      <div className="text-sm font-bold text-slate-700">
+                        Nenhum aluno vinculado por link ainda
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Gere e envie o link de cadastro desta empresa para vincular automaticamente os alunos que se registrarem.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetId = viewingLinkedEmpresa.id;
+                          setViewingLinkedEmpresa(null);
+                          setInviteEmpresaId(targetId);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 cursor-pointer"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        <span>Gerar Link desta Empresa</span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2.5">
+                    {linkedList.map((item, idx) => (
+                      <div
+                        key={`${item.userId}-${idx}`}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-xs"
+                      >
+                        <div>
+                          <div className="font-bold text-slate-900">{item.name}</div>
+                          <div className="text-slate-600 flex items-center gap-1.5 mt-0.5">
+                            <Mail className="w-3 h-3 text-slate-400" />
+                            <span className="font-mono">{item.email}</span>
+                          </div>
+                        </div>
+                        <div className="text-left sm:text-right">
+                          <div className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md inline-block">
+                            UID: {item.userId}
+                          </div>
+                          {item.registeredAt && (
+                            <div className="text-[10px] text-slate-400 mt-1">
+                              Vinculado em {new Date(item.registeredAt).toLocaleDateString('pt-BR')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const targetId = viewingLinkedEmpresa.id;
+                  setViewingLinkedEmpresa(null);
+                  setInviteEmpresaId(targetId);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Enviar Novo Link</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingLinkedEmpresa(null)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ENVIAR LINK DE CADASTRO PARA EMPRESA SELECIONADA */}
+      <EnviarLinkCadastroModal
+        isOpen={Boolean(inviteEmpresaId)}
+        onClose={() => setInviteEmpresaId(null)}
+        currentUser={currentUser}
+        empresasClientes={empresas}
+        plans={plans}
+        preselectedEmpresaId={inviteEmpresaId || undefined}
+        onOpenCadastroPreview={onOpenCadastroPreview}
+      />
 
     </div>
   );

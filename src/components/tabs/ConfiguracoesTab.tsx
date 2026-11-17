@@ -63,7 +63,7 @@ import {
 } from '../../types';
 import { NovoUsuarioModal } from '../modals/NovoUsuarioModal';
 import { EditarUsuarioModal } from '../modals/EditarUsuarioModal';
-import { getSystemUsers, saveSystemUsers, updateSystemUser } from '../../services/userService';
+import { getSystemUsers, saveSystemUsers, updateSystemUser, deleteSystemUser } from '../../services/userService';
 import { NotificacoesConfigView } from './configuracoes/NotificacoesConfigView';
 import { BackupManualConfigView } from './configuracoes/BackupManualConfigView';
 import { MigracoesConfigView } from './configuracoes/MigracoesConfigView';
@@ -463,6 +463,7 @@ interface ConfiguracoesTabProps {
   onImportStudents?: (imported: Student[]) => void;
   onImportTransactions?: (imported: FinancialTransaction[]) => void;
   onImportWorkouts?: (imported: WorkoutPlan[]) => void;
+  empresasClientes?: import('../../types').EmpresaCliente[];
 }
 
 export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
@@ -483,7 +484,8 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
   paymentLinks,
   onImportStudents,
   onImportTransactions,
-  onImportWorkouts
+  onImportWorkouts,
+  empresasClientes = []
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<ConfigSubTab>(initialSubTab);
   const [activeSectionId, setActiveSectionId] = useState<string>('');
@@ -507,10 +509,24 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
   const [isNovoUsuarioModalOpen, setIsNovoUsuarioModalOpen] = useState(false);
   const [isEditarModalOpen, setIsEditarModalOpen] = useState(false);
   const [selectedUserToEdit, setSelectedUserToEdit] = useState<SystemUser | null>(null);
+  const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<string | null>(null);
 
   useEffect(() => {
     saveSystemUsers(users);
   }, [users]);
+
+  useEffect(() => {
+    const handleUsersSync = (e: Event) => {
+      const detail = (e as CustomEvent<SystemUser[]>).detail;
+      if (Array.isArray(detail)) {
+        setUsers(detail);
+      } else {
+        setUsers(getSystemUsers());
+      }
+    };
+    window.addEventListener('glprofit_system_users_updated', handleUsersSync);
+    return () => window.removeEventListener('glprofit_system_users_updated', handleUsersSync);
+  }, []);
 
   // Keep formData in sync if settings prop changes externally
   useEffect(() => {
@@ -600,7 +616,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
   const handleSaveGymSettings = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveSettings(formData);
-    showNotification('Dados da Academia (VB SPORT ADM) salvos com sucesso!');
+    showNotification(`Dados da Academia (${formData.tradeName || formData.gymName || 'GL PRO FIT'}) salvos com sucesso!`);
   };
 
   // Handlers for Tab Settings Config Fields
@@ -673,11 +689,11 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
     }));
   };
 
-  const handleDeleteUser = (userId: string, userName: string) => {
-    if (confirm(`Deseja realmente remover o acesso do usuário "${userName}"?`)) {
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      showNotification(`Usuário "${userName}" removido do sistema.`, 'info');
-    }
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    setConfirmDeleteUserId(null);
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    await deleteSystemUser(userId);
+    showNotification(`Usuário "${userName}" removido do sistema e do banco de dados.`, 'info');
   };
 
   const filteredUsers = users.filter(u => {
@@ -919,7 +935,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                 <Building2 className="h-5 w-5 text-blue-600" />
                 <div>
                   <h2 className="text-base font-bold text-slate-900">
-                    Dados Cadastrais da Academia (VB SPORT ADM)
+                    Dados Cadastrais da Academia ({formData.tradeName || formData.gymName || 'GL PRO FIT'})
                   </h2>
                   <p className="text-xs text-slate-500">
                     Informações institucionais emitidas em contratos, recibos e canais de cobrança
@@ -1115,14 +1131,14 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                 Nenhum usuário encontrado para "{userSearchTerm}".
               </div>
             ) : (
-              filteredUsers.map((u) => {
+              filteredUsers.map((u, index) => {
                 const badge = getRoleBadge(u.role);
                 const isCurrentSession = currentUser 
                   ? (u.id === currentUser.id || u.email.trim().toLowerCase() === currentUser.email.trim().toLowerCase())
-                  : u.email.trim().toLowerCase() === 'marinho.gianluca@gmail.com';
+                  : u.email.trim().toLowerCase() === 'glprofit.adm@gmail.com';
 
                 return (
-                  <div key={u.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 rounded-xl px-2 transition-colors">
+                  <div key={u.id || `usr-${index}`} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 rounded-xl px-2 transition-colors">
                     <div className="flex items-start sm:items-center gap-3">
                       {u.avatar ? (
                         <img
@@ -1166,8 +1182,15 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                               • {u.department}
                             </span>
                           )}
+                          {u.empresaName && (
+                            <span className="rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                              {u.empresaName}
+                            </span>
+                          )}
                           <span className="text-blue-700 font-semibold">
-                            • {u.permissions?.length || 0} módulos liberados
+                            • {u.permissions?.includes('all')
+                              ? 'Acesso Total (Todos os módulos)'
+                              : `${u.permissions?.length || 0} módulos liberados`}
                           </span>
                         </div>
                       </div>
@@ -1190,7 +1213,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                       <button
                         type="button"
                         onClick={() => handleToggleUserStatus(u.id)}
-                        className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors border ${
+                        className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors border cursor-pointer ${
                           u.active 
                             ? 'border-slate-200 text-slate-600 hover:bg-slate-100' 
                             : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
@@ -1201,15 +1224,34 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                         <span>{u.active ? 'Desativar' : 'Ativar'}</span>
                       </button>
 
-                      {!isCurrentSession && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUser(u.id, u.name)}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Excluir usuário"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                      {!isCurrentSession && u.id !== 'admin-master-01' && u.email.trim().toLowerCase() !== 'glprofit.adm@gmail.com' && (
+                        confirmDeleteUserId === u.id ? (
+                          <div className="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(u.id, u.name)}
+                              className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold cursor-pointer"
+                            >
+                              Confirmar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteUserId(null)}
+                              className="px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 text-[11px] font-semibold cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteUserId(u.id)}
+                            className="flex items-center gap-1 rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Excluir usuário"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )
                       )}
                     </div>
                   </div>
@@ -1516,6 +1558,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
         isOpen={isNovoUsuarioModalOpen}
         onClose={() => setIsNovoUsuarioModalOpen(false)}
         onAddUser={handleAddUser}
+        empresasClientes={empresasClientes}
       />
 
       <EditarUsuarioModal
@@ -1526,6 +1569,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
           setSelectedUserToEdit(null);
         }}
         onSaveUser={handleSaveEditedUser}
+        empresasClientes={empresasClientes}
       />
     </div>
   );

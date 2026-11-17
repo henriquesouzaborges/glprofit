@@ -1,0 +1,5 @@
+{
+  "summary":  "Registro técnico das alterações e otimizações de frontend realizadas na versão v2.4.37 do GL PRO FIT: implementação de React.lazy e Suspense para 18 abas, saneamento do Sidebar.tsx e estados legados, centralização de TabType em types.ts, inclusão do consentimento obrigatório LGPD no cadastro de novos alunos, desativação do autofill de senha no login e ajuste na nomenclatura de senhas no manual.",
+  "updatedAt":  "2026-11-11T13:42:01.269897113Z",
+  "userFacing":  true
+}

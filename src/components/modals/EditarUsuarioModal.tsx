@@ -10,7 +10,7 @@ import {
   Lock,
   Sparkles
 } from 'lucide-react';
-import { SystemUser, SystemUserRole } from '../../types';
+import { EmpresaCliente, SystemUser, SystemUserRole } from '../../types';
 import { ALL_SYSTEM_MODULES, SystemModuleDefinition } from '../../services/userService';
 
 interface EditarUsuarioModalProps {
@@ -18,6 +18,7 @@ interface EditarUsuarioModalProps {
   user: SystemUser | null;
   onClose: () => void;
   onSaveUser: (updatedUser: SystemUser) => void;
+  empresasClientes?: EmpresaCliente[];
 }
 
 export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
@@ -25,6 +26,7 @@ export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
   user,
   onClose,
   onSaveUser,
+  empresasClientes = [],
 }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -32,6 +34,7 @@ export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
   const [department, setDepartment] = useState('');
   const [active, setActive] = useState(true);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [empresaId, setEmpresaId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,6 +45,7 @@ export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
       setDepartment(user.department || '');
       setActive(user.active !== undefined ? user.active : true);
       setPermissions(user.permissions || []);
+      setEmpresaId(user.empresaId || '');
       setError(null);
     }
   }, [user, isOpen]);
@@ -93,6 +97,8 @@ export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
       ? ALL_SYSTEM_MODULES.map(m => m.id)
       : (permissions.length > 0 ? permissions : ['inicio']);
 
+    const selectedEmpresa = empresasClientes.find(emp => emp.id === empresaId);
+
     const updatedUser: SystemUser = {
       ...user,
       name: name.trim(),
@@ -101,6 +107,8 @@ export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
       department: department.trim() || undefined,
       active,
       permissions: finalPermissions,
+      empresaId: selectedEmpresa ? selectedEmpresa.id : (empresaId || undefined),
+      empresaName: selectedEmpresa ? selectedEmpresa.name : (empresaId ? user.empresaName : undefined),
     };
 
     onSaveUser(updatedUser);
@@ -254,6 +262,29 @@ export const EditarUsuarioModal: React.FC<EditarUsuarioModalProps> = ({
                 <span className={`h-2.5 w-2.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
               </button>
             </div>
+
+            {empresasClientes.length > 0 && (
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Vincular à Empresa Cliente (Opcional)
+                </label>
+                <select
+                  value={empresaId}
+                  onChange={(e) => setEmpresaId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800 bg-white focus:border-blue-500 focus:outline-hidden"
+                >
+                  <option value="">Unidade Matriz (Sem vínculo exclusivo B2B)</option>
+                  {empresasClientes.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.email})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Quando vinculado a uma empresa cliente, os links de cadastro enviados por este usuário vinculam o aluno automaticamente à empresa.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Permissions Header & Quick Actions */}

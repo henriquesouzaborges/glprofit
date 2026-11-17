@@ -14,13 +14,14 @@ import {
   Sparkles,
   Building
 } from 'lucide-react';
-import { SystemUser, SystemUserRole } from '../../types';
+import { EmpresaCliente, SystemUser, SystemUserRole } from '../../types';
 import { ALL_SYSTEM_MODULES } from '../../services/userService';
 
 interface NovoUsuarioModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddUser: (newUser: Omit<SystemUser, 'id' | 'createdAt'>) => void;
+  empresasClientes?: EmpresaCliente[];
 }
 
 const AVAILABLE_MODULES = ALL_SYSTEM_MODULES;
@@ -38,6 +39,7 @@ export const NovoUsuarioModal: React.FC<NovoUsuarioModalProps> = ({
   isOpen,
   onClose,
   onAddUser,
+  empresasClientes = []
 }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -46,6 +48,7 @@ export const NovoUsuarioModal: React.FC<NovoUsuarioModalProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [department, setDepartment] = useState('Recepção Matriz');
+  const [empresaId, setEmpresaId] = useState('');
   const [permissions, setPermissions] = useState<string[]>(DEFAULT_PERMISSIONS_BY_ROLE.recepcao);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +99,8 @@ export const NovoUsuarioModal: React.FC<NovoUsuarioModalProps> = ({
       return;
     }
 
+    const matchedEmpresa = empresasClientes.find(emp => emp.id === empresaId);
+
     onAddUser({
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -105,6 +110,8 @@ export const NovoUsuarioModal: React.FC<NovoUsuarioModalProps> = ({
       active: true,
       permissions: permissions.length > 0 ? permissions : DEFAULT_PERMISSIONS_BY_ROLE[role],
       password: password.trim(),
+      empresaId: matchedEmpresa?.id || undefined,
+      empresaName: matchedEmpresa?.name || undefined
     });
 
     // Reset form
@@ -114,6 +121,7 @@ export const NovoUsuarioModal: React.FC<NovoUsuarioModalProps> = ({
     setPassword('');
     setRole('recepcao');
     setDepartment('Recepção Matriz');
+    setEmpresaId('');
     setPermissions(DEFAULT_PERMISSIONS_BY_ROLE.recepcao);
     onClose();
   };
@@ -262,6 +270,26 @@ export const NovoUsuarioModal: React.FC<NovoUsuarioModalProps> = ({
                 <Building className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
               </div>
             </div>
+
+            {empresasClientes.length > 0 && (
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Vincular à Empresa Cliente (Opcional)
+                </label>
+                <select
+                  value={empresaId}
+                  onChange={(e) => setEmpresaId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-800 bg-white focus:border-blue-500 focus:outline-hidden"
+                >
+                  <option value="">Unidade Principal / Matriz (Sem empresa específica)</option>
+                  {empresasClientes.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Senha Provisória */}
             <div className="sm:col-span-2">

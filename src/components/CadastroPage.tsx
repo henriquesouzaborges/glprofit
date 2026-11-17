@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Users, 
@@ -20,23 +20,50 @@ import {
   FileText,
   Sun,
   Moon,
-  LogIn
+  LogIn,
+  Building2
 } from 'lucide-react';
-import { SystemUser, Student } from '../types';
+import { SystemUser, Student, EmpresaCliente, Plan } from '../types';
 import { getSystemUsers, saveSystemUsers } from '../services/userService';
 import { logSecurityEvent } from '../services/securityService';
 import { SegurancaDadosModal } from './modals/SegurancaDadosModal';
+import { mapFirebaseAuthError, registerFirebaseAuthAccount } from '../lib/firebase';
+import { saveDocToFirestore, auth } from '../services/firebaseDbService';
+import {
+  fetchStudentInviteById,
+  isLegacyPlaceholderCompanyName,
+  MATRIX_UNIT_COMPANY_ID,
+  recordCompanyStudentLink
+} from '../services/studentInviteService';
 
 interface CadastroPageProps {
   onBackToLogin: () => void;
   onCadastroSuccess?: (data: { user: SystemUser; student?: Student }) => void;
+  empresasClientes?: EmpresaCliente[];
+  plans?: Plan[];
+  gymName?: string;
 }
 
 export type AccountType = 'aluno' | 'responsavel';
 
+interface InviteAttributionContext {
+  inviteId?: string;
+  empresaId: string;
+  empresaName: string;
+  empresaLogoUrl?: string;
+  invitedByUserId?: string;
+  invitedByEmail?: string;
+  suggestedPlanId?: string;
+  suggestedPlanName?: string;
+  suggestedPlanPrice?: number;
+}
+
 export const CadastroPage: React.FC<CadastroPageProps> = ({ 
   onBackToLogin,
-  onCadastroSuccess 
+  onCadastroSuccess,
+  empresasClientes = [],
+  plans = [],
+  gymName
 }) => {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return document.documentElement.classList.contains('dark') || true;
@@ -50,27 +77,66 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [completedInfo, setCompletedInfo] = useState<{
     user: SystemUser;
+    student?: Student;
     studentName?: string;
     guardianName?: string;
+    empresaName?: string;
   } | null>(null);
+
+  const [inviteContext, setInviteContext] = useState<InviteAttributionContext | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const companyIdParam =
+      params.get('companyId') ||
+      params.get('empresaId') ||
+      params.get('tenantId') ||
+      '';
+    const rawEmpresaNameParam = params.get('empresa') || '';
+    const empresaNameParam = isLegacyPlaceholderCompanyName(rawEmpresaNameParam)
+      ? ''
+      : rawEmpresaNameParam;
+    const inviteId =
+      params.get('invite') ||
+      params.get('inviteId') ||
+      params.get('token') ||
+      undefined;
+    const invitedBy = params.get('invitedBy') || undefined;
+
+    if (companyIdParam || empresaNameParam || inviteId) {
+      const matchedEmp = empresasClientes.find(e => e.id === companyIdParam);
+      const safeGymName =
+        gymName && !isLegacyPlaceholderCompanyName(gymName) ? gymName : 'GL PRO FIT (Matriz)';
+      return {
+        inviteId,
+        empresaId: companyIdParam || MATRIX_UNIT_COMPANY_ID,
+        empresaName: matchedEmp?.name || empresaNameParam || safeGymName,
+        empresaLogoUrl: matchedEmp?.logoUrl,
+        invitedByUserId: invitedBy
+      };
+    }
+    return null;
+  });
 
   // Common visibility state
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // ===== Form States: SOU ALUNO =====
-  const [studentForm, setStudentForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phone: '',
-    cpf: '',
-    birthDate: '',
-    gender: 'nao_informar',
-    modality: 'Musculação & Cardio',
-    emergencyContact: '',
-    acceptTerms: true
+  const [studentForm, setStudentForm] = useState(() => {
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    return {
+      name: params?.get('name') || '',
+      email: params?.get('email') || '',
+      password: '',
+      confirmPassword: '',
+      phone: '',
+      cpf: '',
+      birthDate: '',
+      gender: 'nao_informar',
+      modality: 'Musculação & Cardio',
+      emergencyContact: '',
+      acceptTerms: true
+    };
   });
 
   // ===== Form States: SOU O RESPONSÁVEL DO ALUNO =====
@@ -97,6 +163,43 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
     emergencyContact: '',
     acceptMinorAuth: true
   });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const inviteId =
+      params.get('invite') ||
+      params.get('inviteId') ||
+      params.get('token');
+    if (!inviteId) return;
+
+    fetchStudentInviteById(inviteId).then((invite) => {
+      if (!invite) return;
+      const matchedPlan = plans.find(p => p.id === invite.suggestedPlanId);
+      const inviteCompanyId = invite.companyId || invite.empresaId || MATRIX_UNIT_COMPANY_ID;
+      const safeEmpresaName = isLegacyPlaceholderCompanyName(invite.empresaName)
+        ? (gymName && !isLegacyPlaceholderCompanyName(gymName) ? gymName : 'GL PRO FIT')
+        : invite.empresaName;
+      setInviteContext({
+        inviteId: invite.id,
+        empresaId: inviteCompanyId,
+        empresaName: safeEmpresaName,
+        empresaLogoUrl: invite.empresaLogoUrl,
+        invitedByUserId: invite.invitedByUserId,
+        invitedByEmail: invite.invitedByEmail,
+        suggestedPlanId: invite.suggestedPlanId,
+        suggestedPlanName: invite.suggestedPlanName || matchedPlan?.name,
+        suggestedPlanPrice: matchedPlan?.price
+      });
+      setStudentForm(prev => ({
+        ...prev,
+        name: prev.name || invite.studentName || '',
+        email: prev.email || invite.studentEmail || '',
+        phone: prev.phone || invite.studentPhone || '',
+        modality: invite.suggestedPlanName || prev.modality
+      }));
+    }).catch(() => {});
+  }, [plans, gymName]);
 
   // Toggle Theme
   const toggleTheme = () => {
@@ -143,16 +246,24 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
   };
 
   // SUBMIT: Sou Aluno
-  const handleRegisterStudent = (e: React.FormEvent) => {
+  const handleRegisterStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanEmail = studentForm.email.trim().toLowerCase();
+    const cpfDigits = studentForm.cpf.replace(/\D/g, '');
 
     if (!studentForm.name.trim()) {
       setErrorMessage('Por favor, informe seu nome completo.');
       return;
     }
-    if (!studentForm.email.trim() || !studentForm.email.includes('@')) {
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
       setErrorMessage('Informe um e-mail de acesso válido.');
+      return;
+    }
+    if (cleanEmail === 'marinho.gianluca@gmail.com') {
+      setErrorMessage('Este e-mail administrativo foi desativado no sistema.');
       return;
     }
     if (studentForm.password.length < 6) {
@@ -163,14 +274,18 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
       setErrorMessage('As senhas digitadas não conferem.');
       return;
     }
-    if (!studentForm.acceptTerms) {
-      setErrorMessage('Você deve aceitar a Política de Privacidade e os Termos LGPD.');
+    if (cpfDigits.length > 0 && cpfDigits.length !== 11) {
+      setErrorMessage('CPF inválido. Informe os 11 dígitos ou deixe em branco.');
+      return;
+    }
+    if (studentForm.acceptTerms !== true) {
+      setErrorMessage('Você deve aceitar a Política de Privacidade e os Termos LGPD para prosseguir.');
       return;
     }
 
     const currentUsers = getSystemUsers();
     const existing = currentUsers.find(
-      u => u.email.trim().toLowerCase() === studentForm.email.trim().toLowerCase()
+      u => u.email.trim().toLowerCase() === cleanEmail
     );
     if (existing) {
       setErrorMessage(`O e-mail "${studentForm.email}" já está cadastrado no sistema. Faça login com suas credenciais.`);
@@ -179,50 +294,111 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      let registeredUid = '';
+      try {
+        const authResult = await registerFirebaseAuthAccount(cleanEmail, studentForm.password);
+        registeredUid = authResult.uid;
+      } catch (authErr: any) {
+        setErrorMessage(mapFirebaseAuthError(authErr, 'register'));
+        setIsLoading(false);
+        return;
+      }
+
+      if (!registeredUid) {
+        setErrorMessage('Não foi possível confirmar a criação da sua conta segura no Firebase Auth.');
+        setIsLoading(false);
+        return;
+      }
+
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const urlCompanyId =
+        urlParams?.get('companyId') ||
+        urlParams?.get('empresaId') ||
+        urlParams?.get('tenantId') ||
+        '';
+
+      const resolvedCompanyId =
+        inviteContext?.empresaId ||
+        urlCompanyId ||
+        MATRIX_UNIT_COMPANY_ID;
+      const safeFallbackCompanyName =
+        gymName && !isLegacyPlaceholderCompanyName(gymName) ? gymName : 'GL PRO FIT';
+      const resolvedEmpresaName =
+        (inviteContext?.empresaName && !isLegacyPlaceholderCompanyName(inviteContext.empresaName)
+          ? inviteContext.empresaName
+          : safeFallbackCompanyName);
+
       const studentId = `alu-${Date.now()}`;
       const codeNumber = Math.floor(1000 + Math.random() * 9000);
-      const studentCode = `VB-${codeNumber}`;
-      const today = new Date().toISOString().slice(0, 10);
+      const studentCode = `GL-${codeNumber}`;
+      const consentTimestamp = new Date().toISOString();
+      const today = consentTimestamp.slice(0, 10);
       const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const matchedPlan = plans.find(p => p.id === inviteContext?.suggestedPlanId || p.name === studentForm.modality);
 
-      // Create System User
+      // Create System User (ID aligned with Firebase Auth UID, sem senha em texto plano, com companyId e LGPD)
       const newSystemUser: SystemUser = {
-        id: studentId,
+        id: registeredUid,
         name: studentForm.name.trim(),
-        email: studentForm.email.trim().toLowerCase(),
+        email: cleanEmail,
         role: 'aluno',
         phone: studentForm.phone || undefined,
         active: true,
         createdAt: today,
         lastLogin: 'Primeiro acesso',
-        department: `Aluno - ${studentForm.modality}`,
-        permissions: ['inicio', 'treinos', 'agenda', 'avaliacoes', 'nutricao', 'bem_estar']
+        department: `Aluno - ${resolvedEmpresaName}`,
+        permissions: ['inicio', 'treinos', 'agenda', 'avaliacoes', 'nutricao', 'bem_estar'],
+        companyId: resolvedCompanyId,
+        empresaId: resolvedCompanyId,
+        empresaName: resolvedEmpresaName,
+        invitedByUserId: inviteContext?.invitedByUserId,
+        inviteToken: inviteContext?.inviteId,
+        consentLgpd: true,
+        consentLgpdDate: consentTimestamp,
+        consentLgpdVersion: '2026.1'
       };
 
-      saveSystemUsers([...currentUsers, newSystemUser]);
-
-      // Create Student Record in vbsport_students
+      // Create Student Record (companyId + empresaId + consentLgpd obrigatórios, zero senha)
       const newStudent: Student = {
         id: studentId,
         code: studentCode,
         name: studentForm.name.trim(),
-        email: studentForm.email.trim().toLowerCase(),
+        email: cleanEmail,
         phone: studentForm.phone || '(11) 90000-0000',
         cpf: studentForm.cpf || '000.000.000-00',
         birthDate: studentForm.birthDate || '2000-01-01',
-        photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        photo: '',
         status: 'ativo',
-        planId: 'plan-custom',
-        planName: studentForm.modality,
-        planPrice: 149.90,
+        planId: matchedPlan?.id || inviteContext?.suggestedPlanId || 'plan-custom',
+        planName: matchedPlan?.name || inviteContext?.suggestedPlanName || studentForm.modality,
+        planPrice: matchedPlan?.price ?? inviteContext?.suggestedPlanPrice ?? 149.90,
         startDate: today,
         endDate: nextMonth,
         dueDate: '10',
         pendingAmount: 0,
-        notes: `Cadastrado pelo próprio aluno. Emergência: ${studentForm.emergencyContact || 'Não informado'}.`
+        consentLgpd: true,
+        consentLgpdDate: consentTimestamp,
+        consentLgpdVersion: '2026.1',
+        companyId: resolvedCompanyId,
+        empresaId: resolvedCompanyId,
+        empresaName: resolvedEmpresaName,
+        registeredUserId: registeredUid,
+        invitedByUserId: inviteContext?.invitedByUserId,
+        invitedByEmail: inviteContext?.invitedByEmail,
+        inviteToken: inviteContext?.inviteId,
+        registrationSource: inviteContext ? 'link_convite' : 'auto_cadastro',
+        notes: `Cadastrado pelo próprio aluno via ${inviteContext ? `Link de Convite (${resolvedEmpresaName})` : 'Portal de Cadastro'}. Emergência: ${studentForm.emergencyContact || 'Não informado'}.`
       };
+
+      // Gravação obrigatória nas coleções Firestore 'users', 'system_users' e 'students' com companyId
+      if (auth?.currentUser) {
+        await saveDocToFirestore('users', newSystemUser);
+        await saveDocToFirestore('system_users', newSystemUser);
+        await saveDocToFirestore('students', newStudent);
+      }
+
+      saveSystemUsers([...currentUsers, newSystemUser]);
 
       try {
         const savedStudents = localStorage.getItem('vbsport_students');
@@ -230,7 +406,27 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
         list.unshift(newStudent);
         localStorage.setItem('vbsport_students', JSON.stringify(list));
       } catch (err) {
-        console.error('Erro ao salvar aluno:', err);
+        console.error('Erro ao salvar aluno localmente:', err);
+      }
+
+      await recordCompanyStudentLink({
+        empresaId: resolvedCompanyId,
+        empresaName: resolvedEmpresaName,
+        userId: registeredUid,
+        studentId: newStudent.id,
+        email: cleanEmail,
+        studentName: newStudent.name,
+        inviteId: inviteContext?.inviteId,
+        invitedByUserId: inviteContext?.invitedByUserId,
+        invitedByEmail: inviteContext?.invitedByEmail
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('glprofit_student_registered_via_link', {
+            detail: { user: newSystemUser, student: newStudent }
+          })
+        );
       }
 
       // Security Audit Log
@@ -239,16 +435,27 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
         userEmail: newSystemUser.email,
         userName: newSystemUser.name,
         provider: 'email_password',
-        details: `Novo aluno cadastrado com sucesso. Matrícula: ${studentCode}.`,
+        details: `Novo aluno cadastrado (${studentCode}) e vinculado à empresa "${resolvedEmpresaName}" (companyId: ${resolvedCompanyId}, UID: ${registeredUid}).`,
         status: 'success'
       });
 
       setCompletedInfo({
         user: newSystemUser,
-        studentName: newSystemUser.name
+        student: newStudent,
+        studentName: newSystemUser.name,
+        empresaName: resolvedEmpresaName
       });
       setIsCompleted(true);
-    }, 700);
+    } catch (err: any) {
+      console.error('Erro ao persistir cadastro do aluno:', err);
+      setErrorMessage(
+        err?.message?.includes('permission')
+          ? 'Permissão negada ao gravar seu cadastro no banco de dados. Verifique os termos LGPD e tente novamente.'
+          : 'Não foi possível finalizar a gravação do cadastro. Tente novamente.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // ADVANCE GUARDIAN STEP 1 -> 2
@@ -256,20 +463,28 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanGuardianEmail = guardianForm.email.trim().toLowerCase();
+    const cpfDigits = guardianForm.cpf.replace(/\D/g, '');
+
     if (!guardianForm.name.trim()) {
       setErrorMessage('Informe o nome completo do responsável.');
       return;
     }
-    if (!guardianForm.cpf.trim() || guardianForm.cpf.length < 11) {
-      setErrorMessage('Informe um CPF válido para o responsável.');
+    if (cpfDigits.length !== 11) {
+      setErrorMessage('Informe um CPF válido (11 dígitos) para o responsável.');
       return;
     }
-    if (!guardianForm.phone.trim()) {
-      setErrorMessage('Informe o WhatsApp ou telefone do responsável.');
+    if (guardianForm.phone.replace(/\D/g, '').length < 10) {
+      setErrorMessage('Informe um WhatsApp ou telefone válido para o responsável.');
       return;
     }
-    if (!guardianForm.email.trim() || !guardianForm.email.includes('@')) {
+    if (!cleanGuardianEmail || !emailRegex.test(cleanGuardianEmail)) {
       setErrorMessage('Informe um e-mail válido para o responsável (será usado para login).');
+      return;
+    }
+    if (cleanGuardianEmail === 'marinho.gianluca@gmail.com') {
+      setErrorMessage('Este e-mail administrativo foi desativado no sistema.');
       return;
     }
     if (guardianForm.password.length < 6) {
@@ -280,14 +495,14 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
       setErrorMessage('As senhas digitadas não conferem.');
       return;
     }
-    if (!guardianForm.acceptTerms) {
-      setErrorMessage('O responsável deve aceitar a Política de Privacidade e os Termos de Proteção de Dados.');
+    if (guardianForm.acceptTerms !== true) {
+      setErrorMessage('O responsável deve aceitar a Política de Privacidade e os Termos de Proteção de Dados (LGPD).');
       return;
     }
 
     const currentUsers = getSystemUsers();
     const existing = currentUsers.find(
-      u => u.email.trim().toLowerCase() === guardianForm.email.trim().toLowerCase()
+      u => u.email.trim().toLowerCase() === cleanGuardianEmail
     );
     if (existing) {
       setErrorMessage(`O e-mail "${guardianForm.email}" já está cadastrado no sistema. Faça login ou use outro e-mail.`);
@@ -299,7 +514,7 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
   };
 
   // SUBMIT: Sou o Responsável do Aluno (Etapa 2 Final)
-  const handleRegisterGuardianAndStudent = (e: React.FormEvent) => {
+  const handleRegisterGuardianAndStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -311,59 +526,119 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
       setErrorMessage('Informe a data de nascimento do aluno.');
       return;
     }
-    if (!dependentStudentForm.acceptMinorAuth) {
-      setErrorMessage('O responsável legal deve assinar e aceitar o Termo de Autorização e LGPD do Menor.');
+    if (guardianForm.acceptTerms !== true || dependentStudentForm.acceptMinorAuth !== true) {
+      setErrorMessage('O responsável legal deve assinar e aceitar ambos os Termos LGPD e de Autorização do Menor.');
       return;
     }
 
+    const cleanGuardianEmail = guardianForm.email.trim().toLowerCase();
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      const today = new Date().toISOString().slice(0, 10);
-      const guardianId = `resp-${Date.now()}`;
+    try {
+      let registeredUid = '';
+      try {
+        const authResult = await registerFirebaseAuthAccount(cleanGuardianEmail, guardianForm.password);
+        registeredUid = authResult.uid;
+      } catch (authErr: any) {
+        setErrorMessage(mapFirebaseAuthError(authErr, 'register'));
+        setIsLoading(false);
+        return;
+      }
+
+      if (!registeredUid) {
+        setErrorMessage('Não foi possível confirmar a criação da sua conta segura no Firebase Auth.');
+        setIsLoading(false);
+        return;
+      }
+
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const urlCompanyId =
+        urlParams?.get('companyId') ||
+        urlParams?.get('empresaId') ||
+        urlParams?.get('tenantId') ||
+        '';
+
+      const resolvedCompanyId =
+        inviteContext?.empresaId ||
+        urlCompanyId ||
+        MATRIX_UNIT_COMPANY_ID;
+      const safeFallbackCompanyName =
+        gymName && !isLegacyPlaceholderCompanyName(gymName) ? gymName : 'GL PRO FIT';
+      const resolvedEmpresaName =
+        (inviteContext?.empresaName && !isLegacyPlaceholderCompanyName(inviteContext.empresaName)
+          ? inviteContext.empresaName
+          : safeFallbackCompanyName);
+
+      const consentTimestamp = new Date().toISOString();
+      const today = consentTimestamp.slice(0, 10);
       const studentId = `alu-dep-${Date.now()}`;
       const codeNumber = Math.floor(1000 + Math.random() * 9000);
-      const studentCode = `VB-${codeNumber}`;
+      const studentCode = `GL-${codeNumber}`;
       const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-      // 1. Create Guardian System User (Account to Login)
+      // 1. Create Guardian System User (ID = Firebase UID, companyId obrigatório, LGPD explícito, zero senha)
       const currentUsers = getSystemUsers();
       const newGuardianUser: SystemUser = {
-        id: guardianId,
+        id: registeredUid,
         name: guardianForm.name.trim(),
-        email: guardianForm.email.trim().toLowerCase(),
-        role: 'aluno', // Role with access to student view / parental portal
+        email: cleanGuardianEmail,
+        role: 'aluno',
         phone: guardianForm.phone,
         active: true,
         createdAt: today,
         lastLogin: 'Primeiro acesso',
-        department: `Responsável Legal (${guardianForm.relationship}) - Aluno: ${dependentStudentForm.name}`,
-        permissions: ['inicio', 'treinos', 'agenda', 'avaliacoes', 'nutricao', 'bem_estar']
+        department: `Responsável (${guardianForm.relationship}) - ${resolvedEmpresaName}`,
+        permissions: ['inicio', 'treinos', 'agenda', 'avaliacoes', 'nutricao', 'bem_estar'],
+        companyId: resolvedCompanyId,
+        empresaId: resolvedCompanyId,
+        empresaName: resolvedEmpresaName,
+        invitedByUserId: inviteContext?.invitedByUserId,
+        inviteToken: inviteContext?.inviteId,
+        consentLgpd: true,
+        consentLgpdDate: consentTimestamp,
+        consentLgpdVersion: '2026.1'
       };
 
-      saveSystemUsers([...currentUsers, newGuardianUser]);
-
-      // 2. Create Student Record in vbsport_students
+      // 2. Create Student Record (companyId obrigatório + consentLgpd == true)
       const newStudent: Student = {
         id: studentId,
         code: studentCode,
         name: dependentStudentForm.name.trim(),
-        email: guardianForm.email.trim().toLowerCase(), // Contact goes to guardian
+        email: cleanGuardianEmail,
         phone: guardianForm.phone,
         cpf: dependentStudentForm.cpfOrDoc || guardianForm.cpf,
         birthDate: dependentStudentForm.birthDate,
-        photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+        photo: '',
         status: 'ativo',
-        planId: 'plan-kids',
-        planName: dependentStudentForm.modality,
-        planPrice: 159.90,
+        planId: inviteContext?.suggestedPlanId || 'plan-kids',
+        planName: inviteContext?.suggestedPlanName || dependentStudentForm.modality,
+        planPrice: inviteContext?.suggestedPlanPrice ?? 159.90,
         startDate: today,
         endDate: nextMonth,
         dueDate: '10',
         pendingAmount: 0,
-        notes: `Aluno Menor. RESPONSÁVEL LEGAL: ${guardianForm.name} (${guardianForm.relationship}) - CPF: ${guardianForm.cpf} - Tel: ${guardianForm.phone} - Email: ${guardianForm.email}. Endereço: ${guardianForm.address || 'Não informado'}. Restrições/Saúde: ${dependentStudentForm.medicalNotes || 'Nenhuma restrição relatada'}. Emergência: ${dependentStudentForm.emergencyContact || guardianForm.phone}.`
+        consentLgpd: true,
+        consentLgpdDate: consentTimestamp,
+        consentLgpdVersion: '2026.1',
+        companyId: resolvedCompanyId,
+        empresaId: resolvedCompanyId,
+        empresaName: resolvedEmpresaName,
+        registeredUserId: registeredUid,
+        invitedByUserId: inviteContext?.invitedByUserId,
+        invitedByEmail: inviteContext?.invitedByEmail,
+        inviteToken: inviteContext?.inviteId,
+        registrationSource: inviteContext ? 'link_convite' : 'auto_cadastro',
+        notes: `Aluno Menor. RESPONSÁVEL LEGAL: ${guardianForm.name} (${guardianForm.relationship}) - CPF: ${guardianForm.cpf} - Tel: ${guardianForm.phone} - Email: ${cleanGuardianEmail}. Endereço: ${guardianForm.address || 'Não informado'}. Restrições/Saúde: ${dependentStudentForm.medicalNotes || 'Nenhuma restrição relatada'}. Emergência: ${dependentStudentForm.emergencyContact || guardianForm.phone}.`
       };
+
+      // Gravação obrigatória nas coleções Firestore 'users', 'system_users' e 'students' com companyId
+      if (auth?.currentUser) {
+        await saveDocToFirestore('users', newGuardianUser);
+        await saveDocToFirestore('system_users', newGuardianUser);
+        await saveDocToFirestore('students', newStudent);
+      }
+
+      saveSystemUsers([...currentUsers, newGuardianUser]);
 
       try {
         const savedStudents = localStorage.getItem('vbsport_students');
@@ -374,23 +649,54 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
         console.error('Erro ao salvar aluno dependente:', err);
       }
 
+      await recordCompanyStudentLink({
+        empresaId: resolvedCompanyId,
+        empresaName: resolvedEmpresaName,
+        userId: registeredUid,
+        studentId: newStudent.id,
+        email: cleanGuardianEmail,
+        studentName: newStudent.name,
+        inviteId: inviteContext?.inviteId,
+        invitedByUserId: inviteContext?.invitedByUserId,
+        invitedByEmail: inviteContext?.invitedByEmail
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('glprofit_student_registered_via_link', {
+            detail: { user: newGuardianUser, student: newStudent }
+          })
+        );
+      }
+
       // Security Audit Log
       logSecurityEvent({
         eventType: 'REGISTER_SUCCESS',
         userEmail: newGuardianUser.email,
         userName: newGuardianUser.name,
         provider: 'email_password',
-        details: `Responsável [${guardianForm.name}] e aluno dependente [${dependentStudentForm.name}] cadastrados. Matrícula: ${studentCode}.`,
+        details: `Responsável [${guardianForm.name}] e aluno dependente [${dependentStudentForm.name}] cadastrados (${studentCode}) na empresa "${resolvedEmpresaName}" (companyId: ${resolvedCompanyId}, UID: ${registeredUid}).`,
         status: 'success'
       });
 
       setCompletedInfo({
         user: newGuardianUser,
+        student: newStudent,
         studentName: dependentStudentForm.name,
-        guardianName: guardianForm.name
+        guardianName: guardianForm.name,
+        empresaName: resolvedEmpresaName
       });
       setIsCompleted(true);
-    }, 800);
+    } catch (err: any) {
+      console.error('Erro ao persistir cadastro do responsável e aluno:', err);
+      setErrorMessage(
+        err?.message?.includes('permission')
+          ? 'Permissão negada ao gravar o cadastro no banco de dados. Verifique o termo LGPD e tente novamente.'
+          : 'Não foi possível concluir a gravação do cadastro. Tente novamente.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const studentPassStrength = getPasswordStrength(studentForm.password);
@@ -498,6 +804,19 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
                 <span className="font-mono font-bold text-white">{completedInfo?.user.email}</span>
               </div>
               <div className="flex items-center justify-between text-zinc-400">
+                <span>ID do Usuário:</span>
+                <span className="font-mono font-bold text-zinc-200">{completedInfo?.user.id}</span>
+              </div>
+              {completedInfo?.empresaName && (
+                <div className="flex items-center justify-between text-zinc-400">
+                  <span>Empresa Vinculada:</span>
+                  <span className="font-bold text-emerald-400 flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5" />
+                    {completedInfo.empresaName}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-zinc-400">
                 <span>Tipo de Acesso:</span>
                 <span className="font-semibold text-blue-400">
                   {completedInfo?.guardianName ? 'Responsável + Aluno' : 'Aluno Matriculado'}
@@ -518,7 +837,7 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
                 type="button"
                 onClick={() => {
                   if (onCadastroSuccess && completedInfo) {
-                    onCadastroSuccess({ user: completedInfo.user });
+                    onCadastroSuccess({ user: completedInfo.user, student: completedInfo.student });
                   } else {
                     onBackToLogin();
                   }
@@ -563,6 +882,35 @@ export const CadastroPage: React.FC<CadastroPageProps> = ({
               <p className="text-xs sm:text-sm text-zinc-400 mt-1">
                 Escolha abaixo se o cadastro é para você mesmo ou se você é o responsável legal pelo aluno.
               </p>
+
+              {inviteContext && (
+                <div className={`mt-4 rounded-2xl border p-3.5 flex items-center gap-3 ${
+                  isDarkMode
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                }`}>
+                  {inviteContext.empresaLogoUrl ? (
+                    <img
+                      src={inviteContext.empresaLogoUrl}
+                      alt={inviteContext.empresaName}
+                      className="w-10 h-10 rounded-xl object-cover border border-emerald-400/30 bg-white shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold flex items-center gap-1.5 flex-wrap">
+                      <span>Convite oficial de:</span>
+                      <span className="text-emerald-400 font-extrabold">{inviteContext.empresaName}</span>
+                    </div>
+                    <p className="text-[11px] opacity-80 leading-snug mt-0.5">
+                      Ao finalizar o cadastro, seu e-mail e ID de usuário serão vinculados automaticamente a esta empresa.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Selector: Sou Aluno vs Sou o Responsável do Aluno */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">

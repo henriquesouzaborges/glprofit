@@ -33,7 +33,7 @@ export const EsqueciSenhaModal: React.FC<EsqueciSenhaModalProps> = ({
   onSuccess,
   isDarkMode
 }) => {
-  const [step, setStep] = useState<'email' | 'code' | 'new_password' | 'done'>('email');
+  const [step, setStep] = useState<'email' | 'code' | 'new_password' | 'done' | 'email_sent'>('email');
   const [email, setEmail] = useState(defaultEmail);
   const [verificationCode, setVerificationCode] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
@@ -47,7 +47,7 @@ export const EsqueciSenhaModal: React.FC<EsqueciSenhaModalProps> = ({
 
   const strength = evaluatePasswordStrength(newPassword);
 
-  const handleSendCode = (e: React.FormEvent) => {
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) {
@@ -55,8 +55,36 @@ export const EsqueciSenhaModal: React.FC<EsqueciSenhaModalProps> = ({
       return;
     }
 
+    if (cleanEmail === 'marinho.gianluca@gmail.com') {
+      setErrorMessage('O acesso para marinho.gianluca@gmail.com foi desativado. Utilize glprofit.adm@gmail.com.');
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
+
+    if (cleanEmail === 'glprofit.adm@gmail.com') {
+      try {
+        const { sendPasswordResetEmail } = await import('firebase/auth');
+        const { auth } = await import('../../services/firebaseDbService');
+        await sendPasswordResetEmail(auth, cleanEmail);
+        logSecurityEvent({
+          eventType: 'PASSWORD_RESET_REQUEST',
+          userEmail: cleanEmail,
+          userName: 'GL PRO FIT ADM',
+          provider: 'email_password',
+          details: `E-mail oficial de redefinição de senha Firebase Auth enviado para ${cleanEmail}.`,
+          status: 'warning'
+        });
+        setIsLoading(false);
+        setStep('email_sent');
+        return;
+      } catch (err: any) {
+        setIsLoading(false);
+        setErrorMessage(`Não foi possível enviar o link de redefinição via Firebase Auth: ${err?.message || 'verifique sua conexão'}.`);
+        return;
+      }
+    }
 
     setTimeout(() => {
       setIsLoading(false);
@@ -392,6 +420,30 @@ export const EsqueciSenhaModal: React.FC<EsqueciSenhaModalProps> = ({
               )}
             </button>
           </form>
+        )}
+
+        {/* STEP 4B: Firebase Password Reset Email Sent */}
+        {step === 'email_sent' && (
+          <div className="text-center py-4 space-y-4">
+            <div className="inline-flex p-3 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-in zoom-in">
+              <Mail className="w-10 h-10" />
+            </div>
+            <div>
+              <h3 className={`text-base font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                Link de Redefinição Enviado!
+              </h3>
+              <p className={`text-xs mt-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>
+                Enviamos um e-mail oficial do Firebase Auth para <strong>{email.trim().toLowerCase()}</strong>. Acesse sua caixa de entrada para definir uma nova senha com segurança.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm transition-all shadow-lg shadow-blue-900/30"
+            >
+              Voltar ao Login
+            </button>
+          </div>
         )}
 
         {/* STEP 4: Success / Done */}

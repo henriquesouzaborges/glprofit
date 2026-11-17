@@ -1,4 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, User as FirebaseUser } from 'firebase/auth';
+import { where } from 'firebase/firestore';
 import { 
   INITIAL_SETTINGS, 
   INITIAL_PLANS, 
@@ -53,6 +55,7 @@ import {
   SystemUserRole,
   EmpresaCliente,
   EmpresasClientesSubTab,
+  CompanyStudentLink,
   TabType
 } from './types';
 import { 
@@ -61,9 +64,21 @@ import {
   findUserByEmail,
   hasTabPermission,
   getFirstAllowedTab,
-  getModuleName
+  getModuleName,
+  getSystemUsers,
+  saveSystemUsers
 } from './services/userService';
-import { Lock, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import {
+  getStoredCompanyStudentLinks,
+  isCompanyScopedUser,
+  reconcileEmpresasWithLinks,
+  resolveActiveEmpresaForUser,
+  recordCompanyStudentLink,
+  saveCompanyStudentLinksToStorage,
+  sanitizeGymSettings,
+  resolveRegisteredMainCompanyName
+} from './services/studentInviteService';
+import { Lock, ShieldAlert, SlidersHorizontal, AlertTriangle } from 'lucide-react';
 import { Header } from './components/Header';
 import { TopNav } from './components/TopNav';
 import type { DashboardSubTab } from './components/tabs/DashboardsTab';
@@ -99,11 +114,14 @@ import { Footer } from './components/Footer';
 import { PushNotificationContainer } from './components/notifications/PushNotificationContainer';
 import { dispatchPushNotification } from './services/notificationService';
 import { 
+  auth,
   initializeDatabase, 
   subscribeToFirestoreCollection, 
   syncCollectionToFirestore,
   saveDocToFirestore,
-  deleteDocFromFirestore
+  deleteDocFromFirestore,
+  subscribeDatabaseStatus,
+  DatabaseStatus
 } from './services/firebaseDbService';
 
 export default function App() {
@@ -125,6 +143,13 @@ export default function App() {
   }
 
   const [currentUser, setCurrentUser] = useState<SystemUser>(() => getActiveSessionUser());
+  const [dbStatus, setDbStatus] = useState<DatabaseStatus>({
+    connected: false,
+    syncing: false,
+    lastSync: null,
+    error: null,
+    collectionsCount: {}
+  });
 
   // Navigation State - defaults to first allowed tab for current active user
   const [currentTab, setCurrentTab] = useState<TabType>(() => {
@@ -148,14 +173,85 @@ export default function App() {
     const saved = localStorage.getItem('vbsport_empresas_clientes');
     return saved ? JSON.parse(saved) : INITIAL_EMPRESAS_CLIENTES;
   });
+  const [companyStudentLinks, setCompanyStudentLinks] = useState<CompanyStudentLink[]>(() =>
+    getStoredCompanyStudentLinks()
+  );
+
+  // Auth State (defaults to false on fresh start to show requested login page immediately)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const saved = localStorage.getItem('vbsport_auth_session');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(() => auth?.currentUser || null);
+
+  useEffect(() => {
+    const refreshActiveUser = () => {
+      const fresh = getActiveSessionUser();
+      setCurrentUser(fresh);
+    };
+    refreshActiveUser();
+    window.addEventListener('glprofit_active_user_updated', refreshActiveUser);
+    window.addEventListener('glprofit_system_users_updated', refreshActiveUser);
+    return () => {
+      window.removeEventListener('glprofit_active_user_updated', refreshActiveUser);
+      window.removeEventListener('glprofit_system_users_updated', refreshActiveUser);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (fbUser) => {
+      if (fbUser?.email?.trim().toLowerCase() === 'marinho.gianluca@gmail.com') {
+        signOut(auth).catch(() => {});
+        localStorage.removeItem('vbsport_auth_session');
+        setActiveSessionUser(null);
+        setCurrentUser(getActiveSessionUser());
+        setFirebaseUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
+      setFirebaseUser(fbUser);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('vbsport_empresas_clientes', JSON.stringify(empresasClientes));
-    syncCollectionToFirestore('empresas_clientes', empresasClientes);
-  }, [empresasClientes]);
+    if (isAuthenticated && firebaseUser && currentUser?.role === 'admin') {
+      syncCollectionToFirestore('empresas_clientes', empresasClientes);
+    }
+  }, [empresasClientes, isAuthenticated, firebaseUser, currentUser?.role]);
 
   const handleAddEmpresa = async (emp: EmpresaCliente) => {
     setEmpresasClientes(prev => [emp, ...prev]);
+
+    // Provisiona usuário operador da empresa cliente para login direto no próprio perfil B2B
+    const cleanEmpEmail = (emp.email || '').trim().toLowerCase();
+    if (cleanEmpEmail) {
+      const existingUsers = getSystemUsers();
+      if (!existingUsers.some(u => u.email.trim().toLowerCase() === cleanEmpEmail)) {
+        const companyOperatorUser: SystemUser = {
+          id: `emp-usr-${emp.id}`,
+          name: emp.ownerName?.trim() || emp.name,
+          email: cleanEmpEmail,
+          role: 'gerente',
+          department: emp.name,
+          phone: emp.phone,
+          active: emp.status === 'ativo',
+          createdAt: new Date().toISOString().slice(0, 10),
+          permissions: emp.allowedModules && emp.allowedModules.length > 0
+            ? emp.allowedModules
+            : ['inicio', 'clientes', 'agenda', 'treino', 'financeiro'],
+          empresaId: emp.id,
+          empresaName: emp.name
+        };
+        saveSystemUsers([...existingUsers, companyOperatorUser]);
+        if (firebaseUser) {
+          saveDocToFirestore('system_users', companyOperatorUser).catch(() => {});
+        }
+      }
+    }
+
     try {
       await saveDocToFirestore('empresas_clientes', emp);
       showToast(`Empresa "${emp.name}" cadastrada com sucesso!`);
@@ -166,6 +262,28 @@ export default function App() {
 
   const handleUpdateEmpresa = async (emp: EmpresaCliente) => {
     setEmpresasClientes(prev => prev.map(e => e.id === emp.id ? emp : e));
+
+    // Atualiza vínculo/permissões dos usuários associados à empresa cliente
+    const cleanEmpEmail = (emp.email || '').trim().toLowerCase();
+    const existingUsers = getSystemUsers();
+    let userUpdated = false;
+    const nextUsers = existingUsers.map(u => {
+      if (u.empresaId === emp.id || (cleanEmpEmail && u.email.trim().toLowerCase() === cleanEmpEmail)) {
+        userUpdated = true;
+        return {
+          ...u,
+          active: emp.status === 'ativo',
+          permissions: emp.allowedModules && emp.allowedModules.length > 0 ? emp.allowedModules : u.permissions,
+          empresaId: emp.id,
+          empresaName: emp.name
+        };
+      }
+      return u;
+    });
+    if (userUpdated) {
+      saveSystemUsers(nextUsers);
+    }
+
     try {
       await saveDocToFirestore('empresas_clientes', emp);
       showToast(`Empresa "${emp.name}" atualizada.`);
@@ -185,31 +303,29 @@ export default function App() {
   };
   const [isTabConfigModalOpen, setIsTabConfigModalOpen] = useState(false);
 
-  // Auth State (defaults to false on fresh start to show requested login page immediately)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const saved = localStorage.getItem('vbsport_auth_session');
-    return saved ? JSON.parse(saved) : false;
-  });
+  const isCadastroQueryActive = () => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view') || params.get('page') || params.get('action');
+    return (
+      view === 'cadastro' ||
+      view === 'register' ||
+      window.location.hash === '#cadastro' ||
+      window.location.hash === '#register'
+    );
+  };
 
-  const [authView, setAuthView] = useState<'login' | 'cadastro'>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const view = params.get('view') || params.get('page') || params.get('action');
-      if (view === 'cadastro' || view === 'register') return 'cadastro';
-      if (window.location.hash === '#cadastro' || window.location.hash === '#register') return 'cadastro';
-    }
-    return 'login';
-  });
+  const [forceCadastroRoute, setForceCadastroRoute] = useState<boolean>(() => isCadastroQueryActive());
+
+  const [authView, setAuthView] = useState<'login' | 'cadastro'>(() =>
+    isCadastroQueryActive() ? 'cadastro' : 'login'
+  );
 
   useEffect(() => {
     const handleUrlChange = () => {
-      const params = new URLSearchParams(window.location.search);
-      const view = params.get('view') || params.get('page') || params.get('action');
-      if (view === 'cadastro' || view === 'register' || window.location.hash === '#cadastro' || window.location.hash === '#register') {
-        setAuthView('cadastro');
-      } else {
-        setAuthView('login');
-      }
+      const isCad = isCadastroQueryActive();
+      setForceCadastroRoute(isCad);
+      setAuthView(isCad ? 'cadastro' : 'login');
     };
     window.addEventListener('popstate', handleUrlChange);
     window.addEventListener('hashchange', handleUrlChange);
@@ -218,6 +334,17 @@ export default function App() {
       window.removeEventListener('hashchange', handleUrlChange);
     };
   }, []);
+
+  const handleOpenCadastroPreview = (url: string) => {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      window.history.pushState({}, '', `${parsed.pathname}${parsed.search}`);
+    } catch {
+      // ignore invalid URL parse fallback
+    }
+    setForceCadastroRoute(true);
+    setAuthView('cadastro');
+  };
 
   const [authRole, setAuthRole] = useState<'treinador' | 'aluno'>(() => {
     const active = getActiveSessionUser();
@@ -229,6 +356,13 @@ export default function App() {
     if (!hasTabPermission(tab, currentUser)) {
       showToast(`Acesso restrito: Você não tem permissão para acessar o módulo "${getModuleName(tab)}".`);
       return;
+    }
+    if (tab === 'pay') {
+      setFinanceiroSubTab('gl_profit_pay');
+      if (hasTabPermission('financeiro', currentUser)) {
+        setCurrentTab('financeiro');
+        return;
+      }
     }
     setCurrentTab(tab);
   };
@@ -253,6 +387,15 @@ export default function App() {
     name?: string;
     user?: SystemUser;
   }) => {
+    const cleanEmail = (data.email || '').trim().toLowerCase();
+    if (cleanEmail === 'marinho.gianluca@gmail.com') {
+      signOut(auth).catch(() => {});
+      localStorage.removeItem('vbsport_auth_session');
+      setIsAuthenticated(false);
+      showToast('Acesso desativado para marinho.gianluca@gmail.com. Utilize glprofit.adm@gmail.com.');
+      return;
+    }
+
     let resolvedUser = data.user;
     if (!resolvedUser) {
       resolvedUser = findUserByEmail(data.email) || undefined;
@@ -320,13 +463,19 @@ export default function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('vbsport_auth_session');
+    signOut(auth).catch(() => {});
     showToast('Você saiu da sua conta.');
   };
 
   // Persistence States
   const [settings, setSettings] = useState<GymSettings>(() => {
     const saved = localStorage.getItem('vbsport_settings');
-    return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+    if (!saved) return INITIAL_SETTINGS;
+    try {
+      return sanitizeGymSettings(JSON.parse(saved));
+    } catch {
+      return INITIAL_SETTINGS;
+    }
   });
 
   const [plans, setPlans] = useState<Plan[]>(() => {
@@ -447,142 +596,273 @@ export default function App() {
     };
   }, []);
 
-  // Sincronização em Tempo Real com Banco de Dados Firebase Firestore
+  // Sincronização em Tempo Real com Banco de Dados Firebase Firestore (Política Zero-Mock)
   useEffect(() => {
     initializeDatabase();
-
-    const unsubSettings = subscribeToFirestoreCollection('system_settings', (data) => {
-      if (data && data.length > 0) {
-        const general = data.find((d: any) => d.id === 'general') || data[0];
-        setSettings(prev => ({ ...prev, ...general }));
-      }
-    });
-    const unsubPlans = subscribeToFirestoreCollection('plans', (data) => setPlans(data), INITIAL_PLANS);
-    const unsubStudents = subscribeToFirestoreCollection('students', (data) => setStudents(data), INITIAL_STUDENTS);
-    const unsubTx = subscribeToFirestoreCollection('financial_transactions', (data) => setTransactions(data), INITIAL_TRANSACTIONS);
-    const unsubClasses = subscribeToFirestoreCollection('classes', (data) => setClasses(data), INITIAL_CLASSES);
-    const unsubWorkouts = subscribeToFirestoreCollection('workouts', (data) => setWorkouts(data), INITIAL_WORKOUTS);
-    const unsubLeads = subscribeToFirestoreCollection('leads', (data) => setLeads(data), INITIAL_LEADS);
-    const unsubProducts = subscribeToFirestoreCollection('products', (data) => setProducts(data), INITIAL_PRODUCTS);
-    const unsubComandas = subscribeToFirestoreCollection('comandas', (data) => setComandas(data), INITIAL_COMANDAS);
-    const unsubStock = subscribeToFirestoreCollection('stock_movements', (data) => setStockMovements(data), INITIAL_STOCK_MOVEMENTS);
-    const unsubSuppliers = subscribeToFirestoreCollection('suppliers', (data) => setSuppliers(data), INITIAL_SUPPLIERS);
-    const unsubRecurring = subscribeToFirestoreCollection('recurring_charges', (data) => setRecurringCharges(data), INITIAL_PAY_RECURRING);
-    const unsubLinks = subscribeToFirestoreCollection('payment_links', (data) => setPaymentLinks(data), INITIAL_PAYMENT_LINKS);
-    const unsubCrmActivities = subscribeToFirestoreCollection('crm_activities', (data) => setCrmActivities(data), INITIAL_CRM_ACTIVITIES);
-    const unsubAutomations = subscribeToFirestoreCollection('crm_automations', (data) => setCrmAutomations(data), INITIAL_CRM_AUTOMATIONS);
-    const unsubSurveys = subscribeToFirestoreCollection('satisfaction_surveys', (data) => setSatisfactionSurveys(data), INITIAL_SATISFACTION_SURVEYS);
-    const unsubCalendar = subscribeToFirestoreCollection('calendar_events', (data) => setCalendarEvents(data), INITIAL_CALENDAR_EVENTS);
-    const unsubEmpresas = subscribeToFirestoreCollection('empresas_clientes', (data) => setEmpresasClientes(data), INITIAL_EMPRESAS_CLIENTES);
-
+    const unsubDbStatus = subscribeDatabaseStatus((st) => setDbStatus(st));
     return () => {
-      unsubSettings();
-      unsubPlans();
-      unsubStudents();
-      unsubTx();
-      unsubClasses();
-      unsubWorkouts();
-      unsubLeads();
-      unsubProducts();
-      unsubComandas();
-      unsubStock();
-      unsubSuppliers();
-      unsubRecurring();
-      unsubLinks();
-      unsubCrmActivities();
-      unsubAutomations();
-      unsubSurveys();
-      unsubCalendar();
-      unsubEmpresas();
+      unsubDbStatus();
     };
   }, []);
 
-  // Sync to LocalStorage and Firebase Firestore Cloud Database
+  useEffect(() => {
+    if (!isAuthenticated || !firebaseUser) return;
+
+    const isStudentUser = currentUser?.role === 'aluno';
+    const isAdminOrGerente = currentUser?.role === 'admin' || currentUser?.role === 'gerente';
+    const activeCompany = resolveActiveEmpresaForUser(
+      currentUser,
+      empresasClientes,
+      resolveRegisteredMainCompanyName(settings)
+    );
+    const scopedCompany = isCompanyScopedUser(currentUser, empresasClientes);
+
+    const unsubs: Array<() => void> = [];
+
+    unsubs.push(
+      subscribeToFirestoreCollection('system_settings', (data) => {
+        if (data && data.length > 0) {
+          const general = data.find((d: any) => d.id === 'general');
+          if (general) {
+            setSettings(prev => sanitizeGymSettings({ ...prev, ...general }));
+          }
+        }
+      })
+    );
+    unsubs.push(subscribeToFirestoreCollection('plans', (data) => setPlans(data)));
+    unsubs.push(subscribeToFirestoreCollection('classes', (data) => setClasses(data)));
+
+    // Multi-tenant & RBAC enforced Firestore list queries
+    if (isStudentUser) {
+      unsubs.push(
+        subscribeToFirestoreCollection(
+          'students',
+          (data) => setStudents(data),
+          undefined,
+          undefined,
+          [where('registeredUserId', '==', firebaseUser.uid)]
+        )
+      );
+      unsubs.push(
+        subscribeToFirestoreCollection<CompanyStudentLink>(
+          'company_student_links',
+          (links) => {
+            setCompanyStudentLinks(links);
+            saveCompanyStudentLinksToStorage(links);
+          },
+          undefined,
+          undefined,
+          [where('userId', '==', firebaseUser.uid)]
+        )
+      );
+    } else {
+      const studentConstraints = scopedCompany
+        ? [where('companyId', '==', activeCompany.id)]
+        : undefined;
+      unsubs.push(
+        subscribeToFirestoreCollection('students', (data) => setStudents(data), undefined, undefined, studentConstraints)
+      );
+      unsubs.push(
+        subscribeToFirestoreCollection<CompanyStudentLink>(
+          'company_student_links',
+          (links) => {
+            setCompanyStudentLinks(links);
+            saveCompanyStudentLinksToStorage(links);
+          },
+          undefined,
+          undefined,
+          studentConstraints
+        )
+      );
+
+      if (currentUser?.role === 'admin' || currentUser?.role === 'gerente' || currentUser?.role === 'treinador') {
+        unsubs.push(subscribeToFirestoreCollection('workouts', (data) => setWorkouts(data)));
+      }
+      if (currentUser?.role === 'admin' || currentUser?.role === 'gerente' || currentUser?.role === 'financeiro') {
+        unsubs.push(subscribeToFirestoreCollection('financial_transactions', (data) => setTransactions(data)));
+        unsubs.push(subscribeToFirestoreCollection('stock_movements', (data) => setStockMovements(data)));
+        unsubs.push(subscribeToFirestoreCollection('suppliers', (data) => setSuppliers(data)));
+        unsubs.push(subscribeToFirestoreCollection('recurring_charges', (data) => setRecurringCharges(data)));
+        unsubs.push(subscribeToFirestoreCollection('payment_links', (data) => setPaymentLinks(data)));
+      }
+      if (currentUser?.role === 'admin' || currentUser?.role === 'gerente' || currentUser?.role === 'recepcao') {
+        unsubs.push(subscribeToFirestoreCollection('leads', (data) => setLeads(data)));
+        unsubs.push(subscribeToFirestoreCollection('crm_activities', (data) => setCrmActivities(data)));
+        unsubs.push(subscribeToFirestoreCollection('satisfaction_surveys', (data) => setSatisfactionSurveys(data)));
+      }
+      if (currentUser?.role === 'admin' || currentUser?.role === 'gerente' || currentUser?.role === 'financeiro' || currentUser?.role === 'recepcao') {
+        unsubs.push(subscribeToFirestoreCollection('comandas', (data) => setComandas(data)));
+        unsubs.push(subscribeToFirestoreCollection('products', (data) => setProducts(data)));
+      }
+      if (isAdminOrGerente) {
+        unsubs.push(subscribeToFirestoreCollection('crm_automations', (data) => setCrmAutomations(data)));
+      }
+      if (currentUser?.role === 'admin' || currentUser?.role === 'gerente' || currentUser?.role === 'treinador' || currentUser?.role === 'recepcao') {
+        unsubs.push(subscribeToFirestoreCollection('calendar_events', (data) => setCalendarEvents(data)));
+      }
+      if (currentUser?.role !== 'aluno') {
+        const empresaConstraints = scopedCompany
+          ? [where('id', '==', activeCompany.id)]
+          : undefined;
+        unsubs.push(
+          subscribeToFirestoreCollection('empresas_clientes', (data) => setEmpresasClientes(data), undefined, undefined, empresaConstraints)
+        );
+      }
+    }
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+    };
+  }, [isAuthenticated, firebaseUser, currentUser?.id, currentUser?.role, currentUser?.companyId, currentUser?.empresaId]);
+
+  // Reconcilia automaticamente alunos vinculados por link em EmpresasClientes
+  useEffect(() => {
+    if (!companyStudentLinks || companyStudentLinks.length === 0) return;
+    setEmpresasClientes(prev => reconcileEmpresasWithLinks(prev, companyStudentLinks));
+  }, [companyStudentLinks]);
+
+  // Sincroniza em tempo real quando um aluno se cadastra via link no mesmo navegador
+  useEffect(() => {
+    const handleLinkUpdate = () => {
+      setCompanyStudentLinks(getStoredCompanyStudentLinks());
+    };
+    const handleStudentRegistered = (e: Event) => {
+      const detail = (e as CustomEvent<{ user: SystemUser; student: Student }>).detail;
+      if (detail?.student) {
+        setStudents(prev => [
+          detail.student,
+          ...prev.filter(s => s.id !== detail.student.id)
+        ]);
+      }
+      setCompanyStudentLinks(getStoredCompanyStudentLinks());
+    };
+    window.addEventListener('glprofit_company_links_updated', handleLinkUpdate);
+    window.addEventListener('glprofit_student_registered_via_link', handleStudentRegistered);
+    return () => {
+      window.removeEventListener('glprofit_company_links_updated', handleLinkUpdate);
+      window.removeEventListener('glprofit_student_registered_via_link', handleStudentRegistered);
+    };
+  }, []);
+
+  // Sync to LocalStorage and Firebase Firestore Cloud Database (apenas com sessão autenticada e papel autorizado)
   useEffect(() => {
     localStorage.setItem('vbsport_settings', JSON.stringify(settings));
-    syncCollectionToFirestore('system_settings', [{ id: 'general', ...settings }]);
-  }, [settings]);
+    if (isAuthenticated && firebaseUser && currentUser?.role === 'admin') {
+      syncCollectionToFirestore('system_settings', [{ id: 'general', ...settings }]);
+    }
+  }, [settings, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_plans', JSON.stringify(plans));
-    syncCollectionToFirestore('plans', plans);
-  }, [plans]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'financeiro'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('plans', plans);
+    }
+  }, [plans, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_students', JSON.stringify(students));
-    syncCollectionToFirestore('students', students);
-  }, [students]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'recepcao', 'treinador'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('students', students);
+    }
+  }, [students, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_transactions', JSON.stringify(transactions));
-    syncCollectionToFirestore('financial_transactions', transactions);
-  }, [transactions]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'financeiro'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('financial_transactions', transactions);
+    }
+  }, [transactions, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_classes', JSON.stringify(classes));
-    syncCollectionToFirestore('classes', classes);
-  }, [classes]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'treinador', 'recepcao'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('classes', classes);
+    }
+  }, [classes, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_workouts', JSON.stringify(workouts));
-    syncCollectionToFirestore('workouts', workouts);
-  }, [workouts]);
-
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'treinador'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('workouts', workouts);
+    }
+  }, [workouts, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_leads', JSON.stringify(leads));
-    syncCollectionToFirestore('leads', leads);
-  }, [leads]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'recepcao'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('leads', leads);
+    }
+  }, [leads, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_products', JSON.stringify(products));
-    syncCollectionToFirestore('products', products);
-  }, [products]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'financeiro'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('products', products);
+    }
+  }, [products, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_comandas', JSON.stringify(comandas));
-    syncCollectionToFirestore('comandas', comandas);
-  }, [comandas]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'financeiro', 'recepcao'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('comandas', comandas);
+    }
+  }, [comandas, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_stock_movements', JSON.stringify(stockMovements));
-    syncCollectionToFirestore('stock_movements', stockMovements);
-  }, [stockMovements]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'financeiro'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('stock_movements', stockMovements);
+    }
+  }, [stockMovements, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_suppliers', JSON.stringify(suppliers));
-    syncCollectionToFirestore('suppliers', suppliers);
-  }, [suppliers]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'financeiro'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('suppliers', suppliers);
+    }
+  }, [suppliers, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_recurring', JSON.stringify(recurringCharges));
-    syncCollectionToFirestore('recurring_charges', recurringCharges);
-  }, [recurringCharges]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'financeiro'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('recurring_charges', recurringCharges);
+    }
+  }, [recurringCharges, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_payment_links', JSON.stringify(paymentLinks));
-    syncCollectionToFirestore('payment_links', paymentLinks);
-  }, [paymentLinks]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'financeiro'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('payment_links', paymentLinks);
+    }
+  }, [paymentLinks, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_crm_activities', JSON.stringify(crmActivities));
-    syncCollectionToFirestore('crm_activities', crmActivities);
-  }, [crmActivities]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'recepcao'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('crm_activities', crmActivities);
+    }
+  }, [crmActivities, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_crm_automations', JSON.stringify(crmAutomations));
-    syncCollectionToFirestore('crm_automations', crmAutomations);
-  }, [crmAutomations]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('crm_automations', crmAutomations);
+    }
+  }, [crmAutomations, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_crm_surveys', JSON.stringify(satisfactionSurveys));
-    syncCollectionToFirestore('satisfaction_surveys', satisfactionSurveys);
-  }, [satisfactionSurveys]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'recepcao'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('satisfaction_surveys', satisfactionSurveys);
+    }
+  }, [satisfactionSurveys, isAuthenticated, firebaseUser, currentUser?.role]);
 
   useEffect(() => {
     localStorage.setItem('vbsport_calendar_events', JSON.stringify(calendarEvents));
-    syncCollectionToFirestore('calendar_events', calendarEvents);
-  }, [calendarEvents]);
+    if (isAuthenticated && firebaseUser && ['admin', 'gerente', 'treinador', 'recepcao'].includes(currentUser?.role || '')) {
+      syncCollectionToFirestore('calendar_events', calendarEvents);
+    }
+  }, [calendarEvents, isAuthenticated, firebaseUser, currentUser?.role]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -606,15 +886,42 @@ export default function App() {
   };
 
   // Student Handlers
+  const mainCompanyDisplayName = resolveRegisteredMainCompanyName(settings);
+
   const handleAddStudent = (newStudent: Student, firstTx?: FinancialTransaction) => {
-    setStudents(prev => [newStudent, ...prev]);
+    const activeEmp = resolveActiveEmpresaForUser(currentUser, empresasClientes, mainCompanyDisplayName);
+    const resolvedCompanyId = newStudent.companyId || newStudent.empresaId || activeEmp.id;
+    const enrichedStudent: Student = {
+      ...newStudent,
+      companyId: resolvedCompanyId,
+      empresaId: resolvedCompanyId,
+      empresaName: newStudent.empresaName || activeEmp.name,
+      registeredUserId: newStudent.registeredUserId || newStudent.id,
+      registrationSource: newStudent.registrationSource || 'manual'
+    };
+
+    setStudents(prev => [enrichedStudent, ...prev]);
     if (firstTx) {
       setTransactions(prev => [firstTx, ...prev]);
     }
-    showToast(`Cliente ${newStudent.name} cadastrado com sucesso!`);
+
+    if (enrichedStudent.empresaId && enrichedStudent.email) {
+      recordCompanyStudentLink({
+        empresaId: enrichedStudent.empresaId,
+        empresaName: enrichedStudent.empresaName || activeEmp.name,
+        userId: enrichedStudent.registeredUserId || enrichedStudent.id,
+        studentId: enrichedStudent.id,
+        email: enrichedStudent.email,
+        studentName: enrichedStudent.name,
+        invitedByUserId: currentUser?.id,
+        invitedByEmail: currentUser?.email
+      }).catch(() => {});
+    }
+
+    showToast(`Cliente ${enrichedStudent.name} cadastrado com sucesso!`);
     dispatchPushNotification({
       title: 'Novo Aluno Matriculado',
-      message: `${newStudent.name} matriculado no plano ${newStudent.planName}.`,
+      message: `${enrichedStudent.name} matriculado no plano ${enrichedStudent.planName}.`,
       type: 'success',
       module: 'alunos',
       eventType: 'novo_aluno',
@@ -815,23 +1122,30 @@ export default function App() {
   };
 
   const handleConvertLeadToStudent = (lead: Lead) => {
+    const activeEmp = resolveActiveEmpresaForUser(currentUser, empresasClientes, mainCompanyDisplayName);
     const newStudent: Student = {
       id: `std-conv-${Date.now()}`,
-      code: `00${Math.floor(100 + Math.random() * 899)}`,
+      code: `${Math.floor(10000 + Math.random() * 89999)}`,
       name: lead.name,
-      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      email: lead.email || `${lead.name.toLowerCase().replace(/\s+/g, '.')}@email.com`,
-      phone: lead.phone,
-      cpf: '000.000.000-00',
-      birthDate: '1998-05-20',
+      photo: '',
+      email: lead.email || '',
+      phone: lead.phone || '',
+      cpf: '',
+      birthDate: '',
       status: 'ativo',
-      planId: plans?.[0]?.id || 'plan-1',
-      planName: plans?.[0]?.name || 'Plano Mensal',
-      planPrice: plans?.[0]?.price || 120,
+      planId: plans?.[0]?.id || '',
+      planName: plans?.[0]?.name || 'Sem Plano Definido',
+      planPrice: plans?.[0]?.price || 0,
       startDate: new Date().toISOString().slice(0, 10),
       endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       pendingAmount: 0,
+      consentLgpd: true,
+      consentLgpdDate: new Date().toISOString(),
+      consentLgpdVersion: '2026.1',
+      companyId: activeEmp.id,
+      empresaId: activeEmp.id,
+      empresaName: activeEmp.name,
       notes: `Convertido a partir de lead CRM (${lead.interest})`
     };
 
@@ -967,7 +1281,7 @@ export default function App() {
 
   const overdueCount = students.filter(s => s.status === 'inadimplente').length;
 
-  if (!isAuthenticated) {
+  if (forceCadastroRoute || !isAuthenticated) {
     return (
       <>
         {toastMessage && (
@@ -976,9 +1290,13 @@ export default function App() {
             {toastMessage}
           </div>
         )}
-        {authView === 'cadastro' ? (
+        {(forceCadastroRoute || authView === 'cadastro') ? (
           <CadastroPage
+            empresasClientes={empresasClientes}
+            plans={plans}
+            gymName={mainCompanyDisplayName}
             onBackToLogin={() => {
+              setForceCadastroRoute(false);
               setAuthView('login');
               try {
                 window.history.replaceState({}, '', window.location.pathname);
@@ -987,6 +1305,19 @@ export default function App() {
               }
             }}
             onCadastroSuccess={(data) => {
+              if (data.student) {
+                setStudents(prev => [
+                  data.student!,
+                  ...prev.filter(s => s.id !== data.student!.id)
+                ]);
+              }
+              setCompanyStudentLinks(getStoredCompanyStudentLinks());
+              setForceCadastroRoute(false);
+              try {
+                window.history.replaceState({}, '', window.location.pathname);
+              } catch (e) {
+                console.warn(e);
+              }
               handleLoginSuccess({
                 email: data.user.email,
                 role: data.user.role,
@@ -1104,6 +1435,44 @@ export default function App() {
         <div className="flex-1 overflow-y-auto overflow-x-hidden custom-main-scrollbar flex flex-col">
           {/* Tab Router Content (Largura Total 100%) */}
           <main className="flex-1 p-3 sm:p-5 md:p-6 w-full min-w-0">
+          {dbStatus.error && (
+            <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <div>
+                  <strong className="font-bold">Falha de Conexão com Firebase Firestore:</strong>{' '}
+                  <span>{dbStatus.error}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                {!firebaseUser && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const provider = new GoogleAuthProvider();
+                        provider.setCustomParameters({ prompt: 'select_account' });
+                        await signInWithPopup(auth, provider);
+                        initializeDatabase();
+                      } catch {
+                        showToast('Faça login com seu e-mail e senha Firebase ou Conta Google autorizada.');
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold cursor-pointer"
+                  >
+                    Autenticar Firebase
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => initializeDatabase()}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold cursor-pointer"
+                >
+                  Tentar Reconectar
+                </button>
+              </div>
+            </div>
+          )}
           {!hasTabPermission(currentTab, currentUser) ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-6 sm:p-10 text-center max-w-xl mx-auto my-8 sm:my-14 shadow-xs animate-in fade-in duration-200">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 shadow-inner mb-4">
@@ -1189,6 +1558,8 @@ export default function App() {
           {(currentTab === 'clientes' || (currentTab as string) === 'alunos') && (
             <AlunosTab
               students={students}
+              plans={plans}
+              products={products}
               onOpenNewStudent={() => setIsNewStudentModalOpen(true)}
               transactions={transactions}
               workouts={workouts}
@@ -1197,6 +1568,10 @@ export default function App() {
               onNavigateToTab={(tab) => setCurrentTab(tab as TabType)}
               onUpdateStudent={handleUpdateStudent}
               onAddSaleTransaction={handleAddSaleTransaction}
+              currentUser={currentUser}
+              empresasClientes={empresasClientes}
+              gymName={mainCompanyDisplayName}
+              onOpenCadastroPreview={handleOpenCadastroPreview}
             />
           )}
 
@@ -1315,7 +1690,7 @@ export default function App() {
             />
           )}
 
-          {/* Tab: Financeiro (Contas a Receber, Pagar, DRE, Extrato e GL Profit Pay como sub-aba) */}
+          {/* Tab: Financeiro (Contas a Receber, Pagar, Planos e Serviços, DRE, Extrato e GL Profit Pay via TopNav) */}
           {(currentTab === 'financeiro' || currentTab === 'pay') && (
             <FinanceiroTab
               transactions={transactions}
@@ -1341,6 +1716,22 @@ export default function App() {
               onAddRecurringCharge={(charge) => {
                 setRecurringCharges(prev => [charge, ...prev]);
                 showToast('Cobrança recorrente cadastrada com sucesso!');
+              }}
+              plans={plans}
+              onAddPlan={(plan) => {
+                setPlans(prev => [plan, ...prev]);
+                saveDocToFirestore('plans', plan);
+                showToast(`Plano "${plan.name}" criado com sucesso!`);
+              }}
+              onUpdatePlan={(updated) => {
+                setPlans(prev => prev.map(p => p.id === updated.id ? updated : p));
+                saveDocToFirestore('plans', updated);
+                showToast(`Plano "${updated.name}" atualizado!`);
+              }}
+              onDeletePlan={(id) => {
+                setPlans(prev => prev.filter(p => p.id !== id));
+                deleteDocFromFirestore('plans', id);
+                showToast('Plano excluído com sucesso!');
               }}
             />
           )}
@@ -1430,6 +1821,10 @@ export default function App() {
               onAddEmpresa={handleAddEmpresa}
               onUpdateEmpresa={handleUpdateEmpresa}
               onDeleteEmpresa={handleDeleteEmpresa}
+              students={students}
+              plans={plans}
+              currentUser={currentUser}
+              onOpenCadastroPreview={handleOpenCadastroPreview}
             />
           )}
 
@@ -1454,6 +1849,7 @@ export default function App() {
               currentUser={currentUser}
               onUpdateCurrentUser={(updated) => setCurrentUser(updated)}
               initialSubTab={configuracoesSubTab}
+              empresasClientes={empresasClientes}
               onImportStudents={(imported) => {
                 setStudents(prev => {
                   const updated = [...prev];

@@ -20,32 +20,11 @@ interface SeedUserSpec {
 
 const SEED_USERS: SeedUserSpec[] = [
   {
-    name: 'Gianluca Marinho',
-    email: 'marinho.gianluca@gmail.com',
+    name: 'GL PRO FIT ADM',
+    email: 'glprofit.adm@gmail.com',
     role: 'admin',
-    department: 'Diretoria Executiva',
-    phone: '(11) 98765-4321'
-  },
-  {
-    name: 'Recepção Matriz',
-    email: 'recepcao@vbsport.com.br',
-    role: 'recepcao',
-    department: 'Atendimento & PDV',
-    phone: '(11) 97123-4567'
-  },
-  {
-    name: 'Prof. Rodrigo Tavares',
-    email: 'rodrigo.tavares@vbsport.com.br',
-    role: 'treinador',
-    department: 'Musculação & Avaliações',
-    phone: '(11) 98222-1144'
-  },
-  {
-    name: 'Amanda Souza',
-    email: 'financeiro@vbsport.com.br',
-    role: 'financeiro',
-    department: 'Controladoria & Contas',
-    phone: '(11) 99333-8822'
+    department: 'Diretoria Executiva & Master',
+    phone: '(61)992095123'
   }
 ];
 

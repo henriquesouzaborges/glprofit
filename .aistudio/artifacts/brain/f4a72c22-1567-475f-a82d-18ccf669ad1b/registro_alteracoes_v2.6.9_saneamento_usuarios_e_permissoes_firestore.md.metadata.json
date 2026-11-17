@@ -1,0 +1,5 @@
+{
+  "summary":  "Registro técnico da versão v2.6.9 cobrindo o saneamento de usuários em userService.ts, correção das regras de permissão no firestore.rules e condicionamento dos listeners Firestore à autenticação ativa.",
+  "updatedAt":  "2026-11-16T15:32:48.629691695Z",
+  "userFacing":  true
+}

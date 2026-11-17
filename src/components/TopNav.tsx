@@ -43,7 +43,8 @@ import {
   HeartHandshake, 
   Pill, 
   Scale, 
-  Droplets
+  Droplets,
+  Layers
 } from 'lucide-react';
 import type { TabType } from '../types';
 import { DashboardSubTab } from './tabs/DashboardsTab';
@@ -168,6 +169,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   const financeiroSubTabs = [
     { id: 'receber', label: 'Contas a Receber e Inadimplência', icon: ArrowDownRight, badge: overdueCount > 0 ? `${overdueCount}` : undefined },
     { id: 'pagar', label: 'Contas a Pagar', icon: ArrowUpRight },
+    { id: 'planos_servicos', label: 'Planos e Serviços', icon: Layers, badge: 'Novo' },
     { id: 'dre', label: 'DRE Gerencial', icon: FileSpreadsheet },
     { id: 'extrato', label: 'Extrato Completo', icon: Receipt },
     { id: 'gl_profit_pay', label: 'GL Profit Pay (Recorrência)', icon: CreditCard, badge: 'Recorrente' },
@@ -232,6 +234,7 @@ export const TopNav: React.FC<TopNavProps> = ({
     agenda: { subs: agendaSubTabs, current: agendaSubTab, onChange: onAgendaSubTabChange },
     whatsapp: { subs: whatsappSubTabs, current: whatsappSubTab, onChange: onWhatsappSubTabChange },
     financeiro: { subs: financeiroSubTabs, current: financeiroSubTab, onChange: onFinanceiroSubTabChange },
+    pay: { subs: financeiroSubTabs, current: 'gl_profit_pay', onChange: onFinanceiroSubTabChange },
     treino: { subs: treinoSubTabs, current: treinoSubTab, onChange: onTreinoSubTabChange },
     bem_estar: { subs: bemEstarSubTabs, current: bemEstarSubTab, onChange: onBemEstarSubTabChange },
     avaliacoes: { subs: avaliacoesSubTabs, current: avaliacoesSubTab, onChange: onAvaliacoesSubTabChange },

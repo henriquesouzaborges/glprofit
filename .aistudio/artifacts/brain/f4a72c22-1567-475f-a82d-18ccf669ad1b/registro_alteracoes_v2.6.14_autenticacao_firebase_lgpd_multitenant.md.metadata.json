@@ -1,0 +1,5 @@
+{
+  "summary": "Registro técnico das alterações da versão v2.6.14: integração estrita de Login e Cadastro ao Firebase Authentication sem senhas em texto plano, vínculo automático multi-tenant (companyId) em users e students, aceite LGPD obrigatório e isolamento de dados em nuvem no Firestore.",
+  "updatedAt": "2026-11-16T18:07:52.178088657Z",
+  "userFacing": true
+}

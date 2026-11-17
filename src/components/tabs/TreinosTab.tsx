@@ -76,7 +76,7 @@ export const TreinosTab: React.FC<TreinosTabProps> = ({
   // Student & PDF Export State
   const [selectedStudentId, setSelectedStudentId] = useState<string>(() => {
     if (workouts?.[0]?.studentId) return workouts[0].studentId;
-    return students?.[0]?.id || 'std-1';
+    return students?.[0]?.id || '';
   });
   const [showPdfModal, setShowPdfModal] = useState(false);
 
@@ -87,15 +87,7 @@ export const TreinosTab: React.FC<TreinosTabProps> = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  const activeStudent = students.find(s => s.id === selectedStudentId) || students[0] || {
-    id: 'std-1',
-    name: selectedWorkout?.studentName || 'Gianluca Marinho',
-    code: 'GL001',
-    email: 'aluno@glprofit.com',
-    phone: '(11) 98765-4321',
-    planName: 'Anual Black VIP',
-    status: 'ativo'
-  } as Student;
+  const activeStudent: Student | null = students.find(s => s.id === selectedStudentId) || students[0] || null;
 
   // Filtering workouts list
   const filteredWorkouts = workouts.filter(w => {
@@ -130,11 +122,11 @@ export const TreinosTab: React.FC<TreinosTabProps> = ({
     const newWorkout: WorkoutPlan = {
       id: `wkt-${Date.now()}`,
       studentId: students[0]?.id || '',
-      studentName: students[0]?.name || 'Aluno GL PRO FIT',
+      studentName: students[0]?.name || '',
       title: tpl.title,
       objective: tpl.objective,
       level: tpl.level,
-      instructor: 'Prof. Gianluca Marinho (CREF 112001-G/SP)',
+      instructor: currentUser?.name || 'Professor Responsável',
       startDate: new Date().toISOString().slice(0, 10),
       validUntil: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       splits: JSON.parse(JSON.stringify(tpl.splits)),
@@ -194,11 +186,15 @@ export const TreinosTab: React.FC<TreinosTabProps> = ({
                   }}
                   className="bg-transparent font-bold text-slate-800 text-xs focus:outline-hidden cursor-pointer max-w-[140px] truncate"
                 >
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
+                  {students.length === 0 ? (
+                    <option value="">Nenhum aluno cadastrado</option>
+                  ) : (
+                    students.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -235,7 +231,7 @@ export const TreinosTab: React.FC<TreinosTabProps> = ({
                 {workouts.length}
               </div>
               <div className="text-[11px] text-emerald-600 font-bold mt-0.5">
-                100% dos alunos com ficha
+                {students.length > 0 ? `${workouts.length} ficha(s) para ${students.length} aluno(s)` : 'Nenhum aluno cadastrado'}
               </div>
             </div>
 
@@ -545,7 +541,7 @@ export const TreinosTab: React.FC<TreinosTabProps> = ({
                 title: `Treino de ${s.name.split(' ')[0]}`,
                 objective: 'Hipertrofia e Condicionamento',
                 level: 'Intermediário',
-                instructor: 'Prof. Gianluca Marinho (CREF 112001-G/SP)',
+                instructor: currentUser?.name || 'Professor Responsável',
                 startDate: new Date().toISOString().slice(0, 10),
                 validUntil: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
                 splits: []

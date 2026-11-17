@@ -2,30 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Global Safety Net (Default-deny catch-all)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // Helper functions
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function userRole() {
-      return isSignedIn() && 'role' in request.auth.token ? request.auth.token.role : 'aluno';
-    }
-
-    function isSystemAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'marinho.gianluca@gmail.com' ||
-        userRole() == 'admin' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-      );
-    }
-
-    function hasRole(allowedRoles) {
-      return isSignedIn() && (isSystemAdmin() || userRole() in allowedRoles);
     }
 
     function incoming() {
@@ -36,47 +20,234 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMasterAdminEmail() {
+      return isSignedIn() && request.auth.token.email == 'glprofit.adm@gmail.com';
+    }
+
+    function userDocData() {
+      return (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))) ?
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data :
+        ((isSignedIn() && exists(/databases/$(database)/documents/system_users/$(request.auth.uid))) ?
+          get(/databases/$(database)/documents/system_users/$(request.auth.uid)).data : null);
+    }
+
+    function userRole() {
+      return isMasterAdminEmail() ? 'admin' :
+        (userDocData() != null && 'role' in userDocData() ? userDocData().role :
+          (isSignedIn() && 'role' in request.auth.token ? request.auth.token.role : 'aluno'));
+    }
+
+    function userCompanyId() {
+      return isMasterAdminEmail() ? 'matriz-gl-pro-fit' :
+        ((userDocData() != null && 'companyId' in userDocData() && userDocData().companyId is string && userDocData().companyId.size() > 0) ?
+          userDocData().companyId :
+          ((userDocData() != null && 'empresaId' in userDocData() && userDocData().empresaId is string && userDocData().empresaId.size() > 0) ?
+            userDocData().empresaId : 'matriz-gl-pro-fit'));
+    }
+
+    function isSystemAdmin() {
+      return isSignedIn() && (
+        isMasterAdminEmail() ||
+        userRole() == "admin"
+      );
+    }
+
+    function isMatrizUser() {
+      return isSystemAdmin() || userCompanyId() == 'matriz-gl-pro-fit';
+    }
+
+    function hasRole(allowedRoles) {
+      return isSignedIn() && (isSystemAdmin() || userRole() in allowedRoles);
+    }
+
+    function hasValidCompanyId(data) {
+      return ('companyId' in data && data.companyId is string && data.companyId.size() > 0 && data.companyId.size() <= 128) ||
+             ('empresaId' in data && data.empresaId is string && data.empresaId.size() > 0 && data.empresaId.size() <= 128);
+    }
+
+    function matchesUserTenant(data) {
+      return isMatrizUser() ||
+        ('companyId' in data && data.companyId == userCompanyId()) ||
+        ('empresaId' in data && data.empresaId == userCompanyId());
+    }
+
+    function isValidUserPayload(data) {
+      return !('password' in data) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 128 &&
+        data.email is string && data.email.size() > 0 && data.email.size() <= 128 &&
+        data.role in ['admin', 'gerente', 'treinador', 'recepcao', 'financeiro', 'aluno'] &&
+        data.active is bool;
+    }
+
     // Connectivity verification probe
     match /test/connection {
       allow read: if true;
       allow write: if false;
     }
 
-    // 1. System Users (Desativado campo 'password' em qualquer gravação)
+    // 1. Authenticated Users & System Users (Sem campo 'password'; auto-cadastro requer role == 'aluno', consentLgpd == true e companyId válido)
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || hasRole(['admin', 'gerente']));
-      allow create, update: if isSystemAdmin() && isValidId(userId) && !('password' in incoming());
+      allow get: if isValidId(userId) && isSignedIn() && (
+        request.auth.uid == userId ||
+        isSystemAdmin() ||
+        (hasRole(['gerente']) && matchesUserTenant(existing()))
+      );
+      allow list: if isSignedIn() && (
+        isSystemAdmin() ||
+        (hasRole(['gerente']) && matchesUserTenant(existing()))
+      );
+      allow create: if isValidId(userId) &&
+        !('password' in request.resource.data) &&
+        isValidUserPayload(incoming()) && (
+          isSystemAdmin() ||
+          (isSignedIn() &&
+            request.auth.uid == userId &&
+            incoming().role == 'aluno' &&
+            request.resource.data.consentLgpd == true &&
+            hasValidCompanyId(incoming()))
+        );
+      allow update: if isValidId(userId) &&
+        !('password' in request.resource.data) &&
+        isValidUserPayload(incoming()) && (
+          isSystemAdmin() ||
+          (isSignedIn() &&
+            request.auth.uid == userId &&
+            incoming().role == existing().role &&
+            incoming().companyId == existing().companyId &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'avatar', 'lastLogin']))
+        );
       allow delete: if isSystemAdmin() && isValidId(userId);
     }
+
     match /system_users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || hasRole(['admin', 'gerente']));
-      allow create, update: if isSystemAdmin() && isValidId(userId) && !('password' in incoming());
+      allow get: if isValidId(userId) && isSignedIn() && (
+        request.auth.uid == userId ||
+        isSystemAdmin() ||
+        (hasRole(['gerente']) && matchesUserTenant(existing()))
+      );
+      allow list: if isSignedIn() && (
+        isSystemAdmin() ||
+        (hasRole(['gerente']) && matchesUserTenant(existing()))
+      );
+      allow create: if isValidId(userId) &&
+        !('password' in request.resource.data) &&
+        isValidUserPayload(incoming()) && (
+          isSystemAdmin() ||
+          (hasRole(['gerente']) && incoming().role != 'admin' && matchesUserTenant(incoming())) ||
+          (isSignedIn() &&
+            request.auth.uid == userId &&
+            incoming().role == 'aluno' &&
+            request.resource.data.consentLgpd == true &&
+            hasValidCompanyId(incoming()))
+        );
+      allow update: if isValidId(userId) &&
+        !('password' in request.resource.data) &&
+        isValidUserPayload(incoming()) && (
+          isSystemAdmin() ||
+          (isSignedIn() &&
+            request.auth.uid == userId &&
+            incoming().role == existing().role &&
+            incoming().companyId == existing().companyId &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'avatar', 'lastLogin']))
+        );
       allow delete: if isSystemAdmin() && isValidId(userId);
     }
 
-    // 2. Empresas Clientes (B2B SaaS - Acesso Restrito a Administradores)
+    // 2. Empresas Clientes (B2B SaaS - Acesso Restrito a Administradores e leitura/vínculo da própria empresa)
     match /empresas_clientes/{empresaId} {
-      allow read, write: if isSystemAdmin() && isValidId(empresaId);
+      allow read: if isValidId(empresaId) && (
+        userRole() == "admin" ||
+        isSystemAdmin() ||
+        (isSignedIn() && (
+          (hasRole(['gerente', 'recepcao', 'financeiro', 'treinador']) && (isMatrizUser() || userCompanyId() == empresaId)) ||
+          existing().email == request.auth.token.email
+        ))
+      );
+      allow create, delete: if isSystemAdmin() && isValidId(empresaId);
+      allow update: if isValidId(empresaId) && (
+        isSystemAdmin() ||
+        (isSignedIn() && (
+          existing().email == request.auth.token.email ||
+          userCompanyId() == empresaId
+        ) && incoming().diff(existing()).affectedKeys().hasOnly(['linkedStudents', 'linkedStudentIds']))
+      );
     }
 
-    // 3. Students (Exige consentLgpd == true na criação)
+    // 2b. Links de Convite de Cadastro por Empresa e Vínculos Automáticos Empresa-Aluno
+    match /student_invites/{inviteId} {
+      allow get: if isValidId(inviteId);
+      allow list: if isSignedIn() && hasRole(['admin', 'gerente', 'recepcao', 'treinador', 'financeiro']) && matchesUserTenant(existing());
+      allow create: if hasRole(['admin', 'gerente', 'recepcao', 'treinador', 'financeiro']) &&
+        isValidId(inviteId) &&
+        hasValidCompanyId(incoming()) &&
+        matchesUserTenant(incoming());
+      allow update: if isValidId(inviteId) && (
+        (hasRole(['admin', 'gerente', 'recepcao']) && matchesUserTenant(existing())) ||
+        (isSignedIn() &&
+         existing().status == 'pendente' &&
+         incoming().status == 'concluido' &&
+         incoming().registeredUserId == request.auth.uid &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'registeredUserId', 'registeredStudentId', 'registeredEmail', 'completedAt']))
+      );
+      allow delete: if hasRole(['admin', 'gerente']) && isValidId(inviteId) && matchesUserTenant(existing());
+    }
+
+    match /company_student_links/{linkId} {
+      allow get: if isValidId(linkId) && isSignedIn() && (
+        (hasRole(['admin', 'gerente', 'recepcao', 'treinador', 'financeiro']) && matchesUserTenant(existing())) ||
+        existing().userId == request.auth.uid
+      );
+      allow list: if isSignedIn() && (
+        (hasRole(['admin', 'gerente', 'recepcao', 'treinador', 'financeiro']) && matchesUserTenant(existing())) ||
+        existing().userId == request.auth.uid
+      );
+      allow create: if isSignedIn() && isValidId(linkId) && hasValidCompanyId(incoming()) && (
+        (hasRole(['admin', 'gerente', 'recepcao', 'treinador', 'financeiro']) && matchesUserTenant(incoming())) ||
+        (incoming().userId == request.auth.uid && incoming().email == request.auth.token.email)
+      );
+      allow update, delete: if hasRole(['admin', 'gerente']) && isValidId(linkId) && matchesUserTenant(existing());
+    }
+
+    // 3. Students (Exige consentLgpd == true e companyId na criação; isolamento estrito por tenant e UID)
     match /students/{studentId} {
-      allow read: if hasRole(['admin', 'gerente', 'recepcao', 'treinador', 'financeiro']);
-      allow create: if hasRole(['admin', 'gerente', 'recepcao']) && isValidId(studentId) &&
-        incoming().consentLgpd == true;
-      allow update: if hasRole(['admin', 'gerente', 'recepcao', 'treinador']) && isValidId(studentId);
+      allow get: if isValidId(studentId) && (
+        (hasRole(['admin', 'gerente', 'recepcao', 'treinador', 'financeiro']) && matchesUserTenant(existing())) ||
+        (isSignedIn() && existing().registeredUserId == request.auth.uid)
+      );
+      allow list: if isSignedIn() && (
+        (hasRole(['admin', 'gerente', 'recepcao', 'treinador', 'financeiro']) && matchesUserTenant(existing())) ||
+        existing().registeredUserId == request.auth.uid
+      );
+      allow create: if isValidId(studentId) &&
+        !('password' in request.resource.data) &&
+        request.resource.data.consentLgpd == true &&
+        hasValidCompanyId(incoming()) &&
+        incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 128 && (
+          (hasRole(['admin', 'gerente', 'recepcao']) && matchesUserTenant(incoming())) ||
+          (isSignedIn() && incoming().registeredUserId == request.auth.uid)
+        );
+      allow update: if isValidId(studentId) &&
+        !('password' in request.resource.data) &&
+        hasRole(['admin', 'gerente', 'recepcao', 'treinador']) &&
+        matchesUserTenant(existing()) &&
+        (isSystemAdmin() || incoming().companyId == existing().companyId);
       allow delete: if isSystemAdmin() && isValidId(studentId);
     }
 
-    // 4. Health & Medical Data (Apenas Admin, Gerente e Treinador)
+    // 4. Health & Medical Data (Restrito a Admin, Gerente, Treinador e Financeiro conforme política)
     match /workouts/{workoutId} {
-      allow read, write: if hasRole(['admin', 'gerente', 'treinador']) && isValidId(workoutId);
+      allow read, write: if isSignedIn() && userRole() in ["admin", "gerente", "treinador", "financeiro"] && isValidId(workoutId);
     }
     match /physical_assessments/{assessmentId} {
-      allow read, write: if hasRole(['admin', 'gerente', 'treinador']) && isValidId(assessmentId);
+      allow read, write: if isSignedIn() && userRole() in ["admin", "gerente", "treinador", "financeiro"] && isValidId(assessmentId);
     }
     match /wellness_checkins/{checkinId} {
-      allow read, write: if hasRole(['admin', 'gerente', 'treinador']) && isValidId(checkinId);
+      allow read, write: if isSignedIn() && userRole() in ["admin", "gerente", "treinador", "financeiro"] && isValidId(checkinId);
     }
     match /nutrition_plans/{planId} {
       allow read, write: if hasRole(['admin', 'gerente', 'treinador']) && isValidId(planId);
@@ -122,7 +293,11 @@ service cloud.firestore {
     // 6. Operational & Operational Management
     match /plans/{planId} {
       allow read: if isSignedIn();
-      allow write: if hasRole(['admin', 'gerente']) && isValidId(planId);
+      allow write: if hasRole(['admin', 'gerente', 'financeiro']) && isValidId(planId);
+    }
+    match /additional_services/{serviceId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole(['admin', 'gerente', 'financeiro']) && isValidId(serviceId);
     }
     match /classes/{classId} {
       allow read: if isSignedIn();
@@ -159,25 +334,29 @@ service cloud.firestore {
     match /lesson_plans/{planId} {
       allow read, write: if hasRole(['admin', 'gerente', 'treinador']) && isValidId(planId);
     }
+    match /folha_teachers/{docId} {
+      allow read, write: if hasRole(['admin', 'gerente', 'treinador', 'financeiro']) && isValidId(docId);
+    }
+    match /folha_turmas/{docId} {
+      allow read, write: if hasRole(['admin', 'gerente', 'treinador', 'financeiro']) && isValidId(docId);
+    }
+    match /folha_records/{docId} {
+      allow read, write: if hasRole(['admin', 'gerente', 'treinador', 'financeiro']) && isValidId(docId);
+    }
     match /tab_settings/{tabId} {
       allow read: if isSignedIn();
       allow write: if isSystemAdmin() && isValidId(tabId);
     }
     match /system_settings/{settingId} {
       allow read: if isSignedIn();
-      allow write: if isSystemAdmin() && isValidId(settingId);
+      allow write: if (isSystemAdmin() || (settingId == 'pay_pix_config' && hasRole(['admin', 'gerente', 'financeiro']))) && isValidId(settingId);
     }
 
-    // 7. Security Audit Logs (Escrita via Admin SDK, Leitura Restrita a Admin)
+    // 7. Security Audit Logs (Leitura Restrita a Admin; criação exige usuário autenticado ou falha registrada sem alteração)
     match /security_audit_logs/{logId} {
       allow read: if isSystemAdmin();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId);
       allow update, delete: if false;
-    }
-
-    // 8. Default-deny catch-all (Global Safety Net)
-    match /{document=**} {
-      allow read, write: if false;
     }
   }
 }

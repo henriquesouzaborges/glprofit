@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ArrowLeft,
   User, 
@@ -54,12 +54,16 @@ import {
   WorkoutPlan, 
   WellnessCheckin,
   PhysicalAssessmentData,
-  PaymentMethod
+  PaymentMethod,
+  Plan,
+  Product
 } from '../../../types';
 import { formatCurrency, formatDate, sendWhatsAppMessage } from '../../../utils';
 import { INITIAL_ASSESSMENTS } from '../treino/AvaliacoesFisicasTab';
 import { INITIAL_WELLNESS_CHECKINS } from '../BemEstarTab';
-import { INITIAL_PLANS, INITIAL_PRODUCTS } from '../../../mockData';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, subscribeToFirestoreCollection } from '../../../services/firebaseDbService';
+import type { ServiceItem } from '../financeiro/PlanosServicosView';
 
 export type FichaSubTab = 
   | 'visao_geral' 
@@ -72,6 +76,8 @@ export type FichaSubTab =
 
 interface FichaCompletaAlunoViewProps {
   student: Student;
+  plans?: Plan[];
+  products?: Product[];
   onBack: () => void;
   transactions: FinancialTransaction[];
   workouts: WorkoutPlan[];
@@ -84,27 +90,10 @@ interface FichaCompletaAlunoViewProps {
   onAddSaleTransaction?: (transaction: FinancialTransaction, updatedStudent?: Student) => void;
 }
 
-// Serviços da academia disponíveis para venda rápida
-const SERVICOS_ACADEMIA = [
-  { id: 'srv-1', name: 'Sessão Avulsa de Personal Trainer', category: 'Personal Trainer', price: 120.00, description: '1 hora com treinador dedicado e planilha individualizada' },
-  { id: 'srv-2', name: 'Pacote 10 Sessões de Personal Trainer', category: 'Personal Trainer', price: 990.00, description: '10 sessões agendáveis com instrutor master' },
-  { id: 'srv-3', name: 'Avaliação Física Completa (Pollock + Bioimpedância)', category: 'Avaliação Física', price: 90.00, description: 'Protocolo de 7 dobras, perímetros e composição corporal' },
-  { id: 'srv-4', name: 'Consulta Nutricional Esportiva com Bioimpedância', category: 'Nutrição', price: 150.00, description: 'Dieta sob medida, macronutrientes e suplementação' },
-  { id: 'srv-5', name: 'Locação Mensal de Armário Individual', category: 'Conveniência', price: 35.00, description: 'Locker com chave privativa no vestiário' },
-  { id: 'srv-6', name: 'Day-Use / Passaporte Convidado VIP', category: 'Acesso', price: 40.00, description: 'Diária completa para 1 convidado treinar junto' }
-];
-
-// Presets de fotos de avatar
-const AVATAR_PRESETS = [
-  { label: 'Homem Esportivo 1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80' },
-  { label: 'Mulher Fitness 1', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80' },
-  { label: 'Homem Esportivo 2', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80' },
-  { label: 'Mulher Fitness 2', url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80' },
-  { label: 'Homem Fitness 3', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80' }
-];
-
 export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
   student,
+  plans = [],
+  products = [],
   onBack,
   transactions,
   workouts,
@@ -125,6 +114,40 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
 
   // Controle de cards minimizados: por padrão todos começam MINIMIZADOS ({})
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  // Serviços adicionais cadastrados no Firestore
+  const [services, setServices] = useState<ServiceItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('glprofit_additional_services');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [confirmLgpdDeleteStep, setConfirmLgpdDeleteStep] = useState<0 | 1 | 2>(0);
+
+  useEffect(() => {
+    let unsubCol: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, (fbUser) => {
+      if (unsubCol) {
+        unsubCol();
+        unsubCol = null;
+      }
+      if (!fbUser) return;
+      unsubCol = subscribeToFirestoreCollection<ServiceItem>('additional_services', (data) => {
+        setServices(data);
+        try {
+          localStorage.setItem('glprofit_additional_services', JSON.stringify(data));
+        } catch {
+          // ignore storage quota
+        }
+      });
+    });
+    return () => {
+      unsubAuth();
+      if (unsubCol) unsubCol();
+    };
+  }, []);
 
   // Modal de Venda Rápida em Financeiro
   const [showVenderModal, setShowVenderModal] = useState(false);
@@ -226,24 +249,27 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
 
   // Cálculos de Idade
   const studentAge = useMemo(() => {
-    if (!currentStudent.birthDate) return 26;
+    if (!currentStudent.birthDate) return null;
     const birth = new Date(currentStudent.birthDate);
+    if (isNaN(birth.getTime())) return null;
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const m = today.getMonth() - birth.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    return age > 0 ? age : 26;
+    return age > 0 ? age : null;
   }, [currentStudent.birthDate]);
 
   // Últimos dados
   const latestCheckin = studentCheckins[0] || null;
   const latestAssessment = studentAssessments[0] || null;
 
-  // Nutrição Personalizada
+  // Nutrição Personalizada baseada exclusivamente em dados reais da avaliação física
   const nutritionPlan = useMemo(() => {
-    const weight = latestAssessment?.weightKg || 74;
-    const height = latestAssessment?.heightCm || 176;
-    const tmb = Math.round(10 * weight + 6.25 * height - 5 * studentAge + 5);
+    if (!latestAssessment?.weightKg || !latestAssessment?.heightCm) return null;
+    const weight = latestAssessment.weightKg;
+    const height = latestAssessment.heightCm;
+    const age = studentAge || 26;
+    const tmb = Math.round(10 * weight + 6.25 * height - 5 * age + 5);
     const get = Math.round(tmb * 1.55);
     const proteinGrams = Math.round(weight * 2.0);
     const fatGrams = Math.round(weight * 0.9);
@@ -256,14 +282,7 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
       proteinGrams,
       fatGrams,
       carbGrams,
-      waterLiters,
-      meals: [
-        { time: '07:30', name: 'Café da Manhã', items: 'Ovos mexidos (3 un), Pão integral (2 fatias), Queijo branco (30g), Café sem açúcar' },
-        { time: '10:30', name: 'Lanche Matutino', items: 'Fruta da estação (banana/maçã), Whey Protein concentrado (30g) com água' },
-        { time: '13:00', name: 'Almoço Completo', items: 'Arroz integral (150g), Feijão (1 concha), Peito de frango grelhado (180g), Salada verde variada à vontade com azeite extravirgem' },
-        { time: '16:30', name: 'Pré-Treino', items: 'Iogurte natural desnatado, Aveia em flocos (30g), Mel (1 colher de chá)' },
-        { time: '20:00', name: 'Jantar', items: 'Batata doce ou mandioca (140g), Filé de peixe ou carne magra grelhada (160g), Legumes cozidos no vapor' }
-      ]
+      waterLiters
     };
   }, [latestAssessment, studentAge]);
 
@@ -329,20 +348,23 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
     let category = '';
 
     if (vendaTipo === 'plano') {
-      const plan = INITIAL_PLANS.find(p => p.id === vendaSelectedId) || INITIAL_PLANS[0];
+      const plan = plans.find(p => p.id === vendaSelectedId);
+      if (!plan) { showToast('Selecione um plano válido.'); return; }
       itemName = `Plano: ${plan.name}`;
       itemPrice = plan.price;
       category = 'Mensalidade';
     } else if (vendaTipo === 'produto') {
-      const prod = INITIAL_PRODUCTS.find(p => p.id === vendaSelectedId) || INITIAL_PRODUCTS[0];
+      const prod = products.find(p => p.id === vendaSelectedId);
+      if (!prod) { showToast('Selecione um produto válido.'); return; }
       itemName = `Produto: ${prod.name} (${vendaQuantity}x)`;
       itemPrice = prod.price * vendaQuantity;
       category = 'Venda PDV / Lanchonete';
     } else {
-      const srv = SERVICOS_ACADEMIA.find(s => s.id === vendaSelectedId) || SERVICOS_ACADEMIA[0];
+      const srv = services.find(s => s.id === vendaSelectedId);
+      if (!srv) { showToast('Selecione um serviço válido.'); return; }
       itemName = `Serviço: ${srv.name} (${vendaQuantity}x)`;
       itemPrice = srv.price * vendaQuantity;
-      category = srv.category;
+      category = srv.category || 'Serviços';
     }
 
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -364,13 +386,15 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
 
     // Se vendeu plano e marcou para atualizar plano do aluno
     if (vendaTipo === 'plano' && vendaAtualizarPlano) {
-      const plan = INITIAL_PLANS.find(p => p.id === vendaSelectedId) || INITIAL_PLANS[0];
-      updatedStudent.planId = plan.id;
-      updatedStudent.planName = plan.name;
-      updatedStudent.planPrice = plan.price;
-      if (vendaStatus === 'pago' && updatedStudent.status === 'inadimplente') {
-        updatedStudent.status = 'ativo';
-        updatedStudent.pendingAmount = 0;
+      const plan = plans.find(p => p.id === vendaSelectedId);
+      if (plan) {
+        updatedStudent.planId = plan.id;
+        updatedStudent.planName = plan.name;
+        updatedStudent.planPrice = plan.price;
+        if (vendaStatus === 'pago' && updatedStudent.status === 'inadimplente') {
+          updatedStudent.status = 'ativo';
+          updatedStudent.pendingAmount = 0;
+        }
       }
     }
 
@@ -750,10 +774,10 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                       <Scale className="w-4 h-4 text-emerald-600" />
                     </div>
                     <div className="text-2xl font-black text-slate-900">
-                      {latestAssessment?.bodyComp?.bodyFatPercent ? `${latestAssessment.bodyComp.bodyFatPercent}%` : '14.2%'}
+                      {latestAssessment?.bodyComp?.bodyFatPercent ? `${latestAssessment.bodyComp.bodyFatPercent}%` : '—'}
                     </div>
                     <p className="text-[11px] text-emerald-600 font-semibold truncate">
-                      {latestAssessment?.weightKg ? `${latestAssessment.weightKg} kg de peso` : 'Peso controlado'}
+                      {latestAssessment?.weightKg ? `${latestAssessment.weightKg} kg de peso` : 'Sem avaliação registrada'}
                     </p>
                   </div>
 
@@ -764,10 +788,12 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                       <Activity className="w-4 h-4 text-purple-600" />
                     </div>
                     <div className="text-2xl font-black text-slate-900">
-                      {latestCheckin ? `${latestCheckin.readinessScore}%` : '85%'}
+                      {latestCheckin ? `${latestCheckin.readinessScore}%` : '—'}
                     </div>
                     <p className="text-[11px] text-purple-600 font-semibold truncate">
-                      {latestCheckin?.readinessStatus === 'alerta' ? 'Alerta de sobrecarga' : 'Apto para treinar'}
+                      {latestCheckin
+                        ? (latestCheckin.readinessStatus === 'alerta' ? 'Alerta de sobrecarga' : 'Apto para treinar')
+                        : 'Sem check-in registrado'}
                     </p>
                   </div>
                 </div>
@@ -1057,29 +1083,6 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                         Usar ícone de perfil no lugar de foto
                       </button>
                     </div>
-
-                    {/* Presets Rápidos */}
-                    <div className="pt-2">
-                      <span className="text-[11px] font-bold text-slate-500 block mb-1.5">
-                        Ou selecione um avatar rápido:
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        {AVATAR_PRESETS.map((preset, pIdx) => (
-                          <button
-                            key={pIdx}
-                            type="button"
-                            onClick={() => {
-                              setFormData(prev => ({ ...prev, photo: preset.url }));
-                              showToast(`Foto alterada para "${preset.label}"`);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-medium hover:bg-slate-100 cursor-pointer"
-                          >
-                            <img src={preset.url} alt={preset.label} className="w-4 h-4 rounded-full object-cover" />
-                            <span>{preset.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1214,7 +1217,7 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                   <select
                     value={formData.planId}
                     onChange={(e) => {
-                      const selected = INITIAL_PLANS.find(p => p.id === e.target.value);
+                      const selected = plans.find(p => p.id === e.target.value);
                       if (selected) {
                         setFormData(prev => ({
                           ...prev,
@@ -1226,11 +1229,15 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                     }}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   >
-                    {INITIAL_PLANS.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} - {formatCurrency(p.price)} ({p.billingCycle})
-                      </option>
-                    ))}
+                    {plans.length === 0 ? (
+                      <option value="">Nenhum plano cadastrado no Financeiro</option>
+                    ) : (
+                      plans.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} - {formatCurrency(p.price)} ({p.billingCycle})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -1396,27 +1403,67 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                     <span>Exportar Relatório Completo (Portabilidade LGPD JSON)</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (confirm(`ATENÇÃO LGPD: Confirma a eliminação e anonimização permanente de todos os dados do aluno ${currentStudent.name}? Esta ação é irreversível.`)) {
-                        if (confirm(`SEGUNDA CONFIRMAÇÃO: Confirma o expurgo dos dados pessoais de ${currentStudent.name}?`)) {
+                  {confirmLgpdDeleteStep === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmLgpdDeleteStep(1)}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Direito ao Esquecimento (Expurgar Dados LGPD)</span>
+                    </button>
+                  )}
+
+                  {confirmLgpdDeleteStep === 1 && (
+                    <div className="flex flex-wrap items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-xs text-rose-900">
+                      <span className="font-bold">Confirmar anonimização irreversível de {currentStudent.name}?</span>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmLgpdDeleteStep(2)}
+                        className="px-3 py-1 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700 cursor-pointer"
+                      >
+                        Avançar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmLgpdDeleteStep(0)}
+                        className="px-2 py-1 rounded-lg text-slate-600 hover:bg-white font-semibold cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+
+                  {confirmLgpdDeleteStep === 2 && (
+                    <div className="flex flex-wrap items-center gap-2 bg-rose-100 border border-rose-300 rounded-xl px-3 py-2 text-xs text-rose-950">
+                      <span className="font-black">SEGUNDA CONFIRMAÇÃO: Expurgar dados definitivamente?</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
                           try {
                             const res = await fetch(`/api/lgpd/delete/${currentStudent.id}`, { method: 'DELETE' });
                             const data = await res.json();
+                            setConfirmLgpdDeleteStep(0);
                             showToast(data.message || "Dados expurgados com sucesso.");
                             onBack();
-                          } catch (err) {
+                          } catch {
+                            setConfirmLgpdDeleteStep(0);
                             showToast("Erro ao expurgar dados LGPD.");
                           }
-                        }
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Direito ao Esquecimento (Expurgar Dados LGPD)</span>
-                  </button>
+                        }}
+                        className="px-3 py-1 rounded-lg bg-rose-700 text-white font-bold hover:bg-rose-800 cursor-pointer"
+                      >
+                        Confirmar Expurgo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmLgpdDeleteStep(0)}
+                        className="px-2 py-1 rounded-lg text-slate-700 hover:bg-white font-semibold cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1861,7 +1908,7 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
               {/* BOTÃO DE VENDER PLANO, PRODUTO OU SERVIÇO */}
               <button
                 onClick={() => {
-                  setVendaSelectedId(INITIAL_PLANS[0]?.id || '');
+                  setVendaSelectedId(plans[0]?.id || '');
                   setVendaTipo('plano');
                   setShowVenderModal(true);
                 }}
@@ -2024,141 +2071,87 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-slate-900">Plano Nutricional & Metas Calóricas</h2>
-              <p className="text-xs text-slate-500">Distribuição de macronutrientes, hidratação e refeições diárias</p>
+              <p className="text-xs text-slate-500">Distribuição de macronutrientes e hidratação calculada a partir da avaliação física real</p>
             </div>
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => {
-                  expandAllInTab(['nut-metas', 'nut-refeicoes']);
-                }}
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 cursor-pointer flex items-center gap-1"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-                Expandir Todos
-              </button>
-              <button
-                onClick={() => {
-                  collapseAllInTab(['nut-metas', 'nut-refeicoes']);
-                }}
-                className="text-xs font-bold text-slate-600 hover:text-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white cursor-pointer flex items-center gap-1"
-              >
-                <Minimize2 className="w-3.5 h-3.5" />
-                Recolher Todos
-              </button>
-              <button
                 onClick={() => onNavigateToTab?.('nutricao')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs cursor-pointer ml-1"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Ajustar Dieta</span>
+                <span>Abrir Módulo de Nutrição</span>
               </button>
             </div>
           </div>
 
-          {/* Card Minimizável 1: Metas de Macronutrientes */}
-          <div className="rounded-3xl bg-white border border-slate-200 shadow-xs overflow-hidden">
-            <div 
-              onClick={() => toggleCard('nut-metas')}
-              className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition-colors select-none"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
-                  <Flame className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Metas Calóricas & Macronutrientes</h3>
-                  <p className="text-xs text-slate-500">
-                    GET Estimado: {nutritionPlan.get} kcal • Água: {nutritionPlan.waterLiters}L • Proteína: {nutritionPlan.proteinGrams}g
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold text-slate-500">
-                  {isCardExpanded('nut-metas') ? 'Recolher' : 'Expandir'}
-                </span>
-                <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
-                  {isCardExpanded('nut-metas') ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </div>
-              </div>
-            </div>
-
-            {isCardExpanded('nut-metas') && (
-              <div className="p-5 border-t border-slate-100 bg-slate-50/30 animate-in fade-in duration-200">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Gasto Diário (GET)</span>
-                    <div className="text-xl font-black text-slate-900">{nutritionPlan.get} kcal</div>
-                    <span className="text-[11px] text-slate-500">TMB: {nutritionPlan.tmb} kcal</span>
+          {nutritionPlan ? (
+            <div className="rounded-3xl bg-white border border-slate-200 shadow-xs overflow-hidden">
+              <div 
+                onClick={() => toggleCard('nut-metas')}
+                className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition-colors select-none"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                    <Flame className="w-5 h-5" />
                   </div>
-
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Proteínas (2g/kg)</span>
-                    <div className="text-xl font-black text-blue-700">{nutritionPlan.proteinGrams} g</div>
-                    <span className="text-[11px] text-slate-500">Reparação muscular</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Metas Calóricas & Macronutrientes</h3>
+                    <p className="text-xs text-slate-500">
+                      GET Estimado: {nutritionPlan.get} kcal • Água: {nutritionPlan.waterLiters}L • Proteína: {nutritionPlan.proteinGrams}g
+                    </p>
                   </div>
+                </div>
 
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Carboidratos</span>
-                    <div className="text-xl font-black text-amber-700">{nutritionPlan.carbGrams} g</div>
-                    <span className="text-[11px] text-slate-500">Energia para o treino</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hidratação Mínima</span>
-                    <div className="text-xl font-black text-cyan-600">{nutritionPlan.waterLiters} L</div>
-                    <span className="text-[11px] text-slate-500">Água diária recomendada</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-slate-500">
+                    {isCardExpanded('nut-metas') ? 'Recolher' : 'Expandir'}
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
+                    {isCardExpanded('nut-metas') ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Card Minimizável 2: Cardápio Programado */}
-          <div className="rounded-3xl bg-white border border-slate-200 shadow-xs overflow-hidden">
-            <div 
-              onClick={() => toggleCard('nut-refeicoes')}
-              className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition-colors select-none"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
-                  <Salad className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Cardápio & Refeições Diárias</h3>
-                  <p className="text-xs text-slate-500">{nutritionPlan.meals.length} refeições estruturadas ao longo do dia</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold text-slate-500">
-                  {isCardExpanded('nut-refeicoes') ? 'Recolher' : 'Expandir'}
-                </span>
-                <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
-                  {isCardExpanded('nut-refeicoes') ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </div>
-              </div>
-            </div>
-
-            {isCardExpanded('nut-refeicoes') && (
-              <div className="p-5 border-t border-slate-100 space-y-3 bg-slate-50/30 animate-in fade-in duration-200">
-                {nutritionPlan.meals.map((meal, mIdx) => (
-                  <div key={mIdx} className="p-3.5 rounded-2xl bg-white border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-xs font-black px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800">
-                        {meal.time}
-                      </span>
-                      <span className="text-xs font-bold text-slate-900">{meal.name}</span>
+              {isCardExpanded('nut-metas') && (
+                <div className="p-5 border-t border-slate-100 bg-slate-50/30 animate-in fade-in duration-200">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Gasto Diário (GET)</span>
+                      <div className="text-xl font-black text-slate-900">{nutritionPlan.get} kcal</div>
+                      <span className="text-[11px] text-slate-500">TMB: {nutritionPlan.tmb} kcal</span>
                     </div>
-                    <div className="text-xs text-slate-600 max-w-xl">
-                      {meal.items}
+
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Proteínas (2g/kg)</span>
+                      <div className="text-xl font-black text-blue-700">{nutritionPlan.proteinGrams} g</div>
+                      <span className="text-[11px] text-slate-500">Reparação muscular</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Carboidratos</span>
+                      <div className="text-xl font-black text-amber-700">{nutritionPlan.carbGrams} g</div>
+                      <span className="text-[11px] text-slate-500">Energia para o treino</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hidratação Mínima</span>
+                      <div className="text-xl font-black text-cyan-600">{nutritionPlan.waterLiters} L</div>
+                      <span className="text-[11px] text-slate-500">Água diária recomendada</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-10 text-center rounded-3xl bg-white border border-dashed border-slate-300 text-slate-500 space-y-2">
+              <Salad className="w-8 h-8 text-slate-300 mx-auto" />
+              <div className="text-sm font-bold text-slate-800">Nenhuma avaliação física ou plano nutricional cadastrado</div>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Registre peso e estatura em Avaliações Físicas ou configure a dieta no módulo de Nutrição para visualizar metas reais deste aluno.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -2209,9 +2202,9 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                       type="button"
                       onClick={() => {
                         setVendaTipo(id as any);
-                        if (id === 'plano') setVendaSelectedId(INITIAL_PLANS[0]?.id || '');
-                        if (id === 'produto') setVendaSelectedId(INITIAL_PRODUCTS[0]?.id || '');
-                        if (id === 'servico') setVendaSelectedId(SERVICOS_ACADEMIA[0]?.id || '');
+                        if (id === 'plano') setVendaSelectedId(plans[0]?.id || '');
+                        if (id === 'produto') setVendaSelectedId(products[0]?.id || '');
+                        if (id === 'servico') setVendaSelectedId(services[0]?.id || '');
                       }}
                       className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
                         vendaTipo === id
@@ -2237,11 +2230,15 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                     onChange={(e) => setVendaSelectedId(e.target.value)}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   >
-                    {INITIAL_PLANS.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — {formatCurrency(p.price)} / {p.billingCycle}
-                      </option>
-                    ))}
+                    {plans.length === 0 ? (
+                      <option value="">Nenhum plano cadastrado em Financeiro &gt; Planos e Serviços</option>
+                    ) : (
+                      plans.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — {formatCurrency(p.price)} / {p.billingCycle}
+                        </option>
+                      ))
+                    )}
                   </select>
 
                   <label className="flex items-center gap-2 pt-1 text-xs text-slate-700 font-semibold cursor-pointer select-none">
@@ -2268,11 +2265,15 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                         onChange={(e) => setVendaSelectedId(e.target.value)}
                         className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                       >
-                        {INITIAL_PRODUCTS.map(prod => (
-                          <option key={prod.id} value={prod.id}>
-                            {prod.name} ({formatCurrency(prod.price)})
-                          </option>
-                        ))}
+                        {products.length === 0 ? (
+                          <option value="">Nenhum produto cadastrado no Estoque</option>
+                        ) : (
+                          products.map(prod => (
+                            <option key={prod.id} value={prod.id}>
+                              {prod.name} ({formatCurrency(prod.price)})
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
 
@@ -2305,11 +2306,15 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                         onChange={(e) => setVendaSelectedId(e.target.value)}
                         className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                       >
-                        {SERVICOS_ACADEMIA.map(srv => (
-                          <option key={srv.id} value={srv.id}>
-                            {srv.name} — {formatCurrency(srv.price)}
-                          </option>
-                        ))}
+                        {services.length === 0 ? (
+                          <option value="">Nenhum serviço cadastrado em Planos e Serviços</option>
+                        ) : (
+                          services.map(srv => (
+                            <option key={srv.id} value={srv.id}>
+                              {srv.name} — {formatCurrency(srv.price)}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
 
@@ -2387,10 +2392,10 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
                   <div className="text-xl font-black text-slate-900">
                     {formatCurrency(
                       vendaTipo === 'plano'
-                        ? (INITIAL_PLANS.find(p => p.id === vendaSelectedId)?.price || 0)
+                        ? (plans.find(p => p.id === vendaSelectedId)?.price || 0)
                         : vendaTipo === 'produto'
-                          ? (INITIAL_PRODUCTS.find(p => p.id === vendaSelectedId)?.price || 0) * vendaQuantity
-                          : (SERVICOS_ACADEMIA.find(s => s.id === vendaSelectedId)?.price || 0) * vendaQuantity
+                          ? (products.find(p => p.id === vendaSelectedId)?.price || 0) * vendaQuantity
+                          : (services.find(s => s.id === vendaSelectedId)?.price || 0) * vendaQuantity
                     )}
                   </div>
                 </div>
@@ -2406,7 +2411,8 @@ export const FichaCompletaAlunoView: React.FC<FichaCompletaAlunoViewProps> = ({
 
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+                    disabled={!vendaSelectedId}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Confirmar Venda</span>

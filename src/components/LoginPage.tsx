@@ -27,8 +27,10 @@ import {
 } from 'lucide-react';
 import { GLProFitLogo } from './GLProFitLogo';
 import loginBg from '../assets/images/login-bg.jpg';
+import { signOut } from 'firebase/auth';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { SystemUser, SystemUserRole } from '../types';
-import { getSystemUsers, saveSystemUsers, setActiveSessionUser } from '../services/userService';
+import { INITIAL_SYSTEM_USERS, getSystemUsers, saveSystemUsers, setActiveSessionUser } from '../services/userService';
 import { 
   checkLoginLockout, 
   recordFailedLoginAttempt, 
@@ -36,6 +38,13 @@ import {
   logSecurityEvent,
   evaluatePasswordStrength
 } from '../services/securityService';
+import {
+  mapFirebaseAuthError,
+  registerFirebaseAuthAccount,
+  signInWithFirebaseEmail
+} from '../lib/firebase';
+import { auth, db, saveDocToFirestore } from '../services/firebaseDbService';
+import { MATRIX_UNIT_COMPANY_ID } from '../services/studentInviteService';
 import { BiometricAuthModal } from './modals/BiometricAuthModal';
 import { EsqueciSenhaModal } from './modals/EsqueciSenhaModal';
 import { GoogleAuthModal } from './modals/GoogleAuthModal';
@@ -84,6 +93,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBypass, 
     const loadedUsers = getSystemUsers();
     setSystemUsers(loadedUsers);
     checkWebAuthnCapabilities().then(setWebAuthnCapabilities);
+
+    const handleSync = () => setSystemUsers(getSystemUsers());
+    window.addEventListener('glprofit_system_users_updated', handleSync);
+    return () => window.removeEventListener('glprofit_system_users_updated', handleSync);
   }, []);
 
   const passwordStrength = evaluatePasswordStrength(password);
@@ -136,14 +149,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBypass, 
   const handleEmailLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
-    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!cleanEmail) {
       setErrorMessage('Por favor, informe seu e-mail cadastrado.');
       return;
     }
 
+    if (!emailRegex.test(cleanEmail)) {
+      setErrorMessage('Formato de e-mail inválido. Verifique o endereço informado.');
+      return;
+    }
+
     if (!password) {
       setErrorMessage('Por favor, digite sua senha de acesso.');
+      return;
+    }
+
+    if (cleanEmail === 'marinho.gianluca@gmail.com') {
+      setErrorMessage('O acesso administrador via marinho.gianluca@gmail.com foi desativado. Utilize o e-mail master atualizado: glprofit.adm@gmail.com.');
       return;
     }
 
@@ -159,166 +183,300 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBypass, 
 
     (async () => {
       try {
-        const currentUsers = getSystemUsers();
-        const matchedUser = currentUsers.find(u => u.email.trim().toLowerCase() === cleanEmail);
-
-        if (matchedUser && !matchedUser.active) {
-          setErrorMessage(`O acesso para "${matchedUser.name}" (${matchedUser.email}) está desativado no sistema. Contate a administração.`);
-          setIsLoading(false);
-          return;
-        }
-
-        let isAuthSuccess = false;
+        // 2. Autenticação estrita e obrigatória via Firebase Authentication (sem bypass de senha local)
+        let firebaseCred;
         try {
-          const { signInWithEmailAndPassword } = await import('firebase/auth');
-          const { auth } = await import('../services/firebaseDbService');
-          if (auth) {
-            await signInWithEmailAndPassword(auth, cleanEmail, password);
-            isAuthSuccess = true;
-          }
+          firebaseCred = await signInWithFirebaseEmail(cleanEmail, password);
         } catch (authError: any) {
-          console.warn('[Firebase Auth Login Check]:', authError?.message || authError);
-          if (matchedUser && password.length >= 6) {
-            isAuthSuccess = true;
-          }
-        }
+          const authCode = String(authError?.code || '');
+          const mappedError = mapFirebaseAuthError(authError, 'login');
 
-        if (!isAuthSuccess && !matchedUser) {
+          if (authCode === 'auth/too-many-requests') {
+            logSecurityEvent({
+              eventType: 'LOGIN_BLOCKED',
+              userEmail: cleanEmail,
+              provider: 'email_password',
+              details: `Firebase Auth bloqueou temporariamente ${cleanEmail} por excesso de tentativas.`,
+              status: 'danger'
+            });
+            setErrorMessage(mappedError);
+            setIsLoading(false);
+            return;
+          }
+
+          if (
+            authCode === 'auth/user-disabled' ||
+            authCode === 'auth/invalid-email' ||
+            authCode === 'auth/network-request-failed' ||
+            authCode === 'auth/operation-not-allowed'
+          ) {
+            logSecurityEvent({
+              eventType: 'LOGIN_FAILED',
+              userEmail: cleanEmail,
+              provider: 'email_password',
+              details: `Falha de login (${authCode}) para ${cleanEmail}.`,
+              status: 'warning'
+            });
+            setErrorMessage(mappedError);
+            setIsLoading(false);
+            return;
+          }
+
           const attemptResult = recordFailedLoginAttempt(cleanEmail);
           logSecurityEvent({
             eventType: 'LOGIN_FAILED',
             userEmail: cleanEmail,
-            userName: 'Desconhecido',
             provider: 'email_password',
-            details: `Tentativa de login com credenciais incorretas para ${cleanEmail}.`,
+            details: `Credenciais inválidas rejeitadas pelo Firebase Auth (${authCode || 'auth_error'}) para ${cleanEmail}.`,
             status: 'danger'
           });
+
           if (attemptResult.isLocked) {
             setErrorMessage(`Limite de 5 tentativas excedido! Conta bloqueada por ${attemptResult.remainingSeconds}s.`);
           } else {
-            setErrorMessage(`E-mail ou senha incorretos. Restam ${attemptResult.attemptsLeft} tentativa(s) antes do bloqueio.`);
+            setErrorMessage(`${mappedError} Restam ${attemptResult.attemptsLeft} tentativa(s) antes do bloqueio temporário.`);
           }
           setIsLoading(false);
           return;
         }
 
-        // 2. Login Bem-sucedido para Usuário do Sistema (SystemUser)
-        if (matchedUser) {
-          clearFailedAttempts(cleanEmail);
+        const authUid = firebaseCred.user.uid;
+        clearFailedAttempts(cleanEmail);
 
-          const updated = currentUsers.map(u => 
-            u.id === matchedUser.id 
-              ? { 
-                  ...u, 
-                  lastLogin: 'Hoje, ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                } 
-              : u
-          );
-          saveSystemUsers(updated);
-          setActiveSessionUser({ ...matchedUser });
+        // 3. Resolver perfil autenticado (SystemUser local / Firestore / Students / Empresas Clientes)
+        const currentUsers = getSystemUsers();
+        let resolvedUser: SystemUser | undefined = currentUsers.find(
+          u => u.id === authUid || u.email.trim().toLowerCase() === cleanEmail
+        );
 
-          logSecurityEvent({
-            eventType: 'LOGIN_SUCCESS',
-            userEmail: matchedUser.email,
-            userName: matchedUser.name,
-            provider: 'email_password',
-            details: `Autenticação por e-mail e senha bem-sucedida para ${matchedUser.name}.`,
-            status: 'success'
-          });
-
-          onLoginSuccess({
-            email: matchedUser.email,
-            role: matchedUser.role,
-            provider: 'email',
-            name: matchedUser.name,
-            user: matchedUser
-          });
-          setIsLoading(false);
-          return;
+        // Buscar no Firestore (/users/{uid} e /system_users/{uid}) caso seja acesso em novo dispositivo/navegador
+        if (!resolvedUser) {
+          try {
+            const userSnap = await getDoc(doc(db, 'users', authUid));
+            if (userSnap.exists()) {
+              resolvedUser = userSnap.data() as SystemUser;
+            } else {
+              const sysSnap = await getDoc(doc(db, 'system_users', authUid));
+              if (sysSnap.exists()) {
+                resolvedUser = sysSnap.data() as SystemUser;
+              }
+            }
+          } catch (fsUserErr) {
+            console.warn('Aviso ao consultar perfil de usuário no Firestore:', fsUserErr);
+          }
         }
 
-        // 3. Aluno matriculado em vbsport_students
-        const savedStudents = localStorage.getItem('vbsport_students');
-        if (savedStudents) {
-          const studentsList = JSON.parse(savedStudents);
-          const matchedStudent = studentsList.find((s: any) => s.email && s.email.trim().toLowerCase() === cleanEmail);
-          
+        // Fallback Master Admin oficial autenticado via Firebase Auth
+        if (!resolvedUser && cleanEmail === 'glprofit.adm@gmail.com') {
+          resolvedUser = INITIAL_SYSTEM_USERS[0];
+        }
+
+        // Verificar se pertence a aluno matriculado (localStorage ou Firestore)
+        if (!resolvedUser) {
+          let matchedStudent: any = null;
+          try {
+            const savedStudents = localStorage.getItem('vbsport_students');
+            if (savedStudents) {
+              const studentsList = JSON.parse(savedStudents);
+              matchedStudent = studentsList.find(
+                (s: any) => s.registeredUserId === authUid || (s.email && s.email.trim().toLowerCase() === cleanEmail)
+              );
+            }
+          } catch {
+            matchedStudent = null;
+          }
+
+          if (!matchedStudent) {
+            try {
+              const studentByUid = await getDocs(
+                query(collection(db, 'students'), where('registeredUserId', '==', authUid))
+              );
+              if (!studentByUid.empty) {
+                matchedStudent = studentByUid.docs[0].data();
+              }
+            } catch (fsStudentErr) {
+              console.warn('Aviso ao consultar aluno no Firestore:', fsStudentErr);
+            }
+          }
+
           if (matchedStudent) {
             if (matchedStudent.status === 'cancelado') {
+              await signOut(auth).catch(() => {});
               setErrorMessage(`A matrícula de "${matchedStudent.name}" está inativa ou cancelada. Contate a recepção.`);
               setIsLoading(false);
               return;
             }
 
-            clearFailedAttempts(cleanEmail);
-
-            const studentUser: SystemUser = {
-              id: matchedStudent.id,
+            const studentCompanyId = matchedStudent.companyId || matchedStudent.empresaId || MATRIX_UNIT_COMPANY_ID;
+            resolvedUser = {
+              id: authUid,
               name: matchedStudent.name,
-              email: matchedStudent.email,
+              email: matchedStudent.email || cleanEmail,
               role: 'aluno',
               active: matchedStudent.status === 'ativo',
               createdAt: matchedStudent.startDate || matchedStudent.joinDate || '2026-01-01',
               department: 'Aluno Matriculado',
               avatar: matchedStudent.photo,
-              permissions: ['inicio', 'treinos', 'agenda', 'pay']
+              permissions: ['inicio', 'treinos', 'agenda', 'avaliacoes', 'nutricao', 'bem_estar'],
+              companyId: studentCompanyId,
+              empresaId: studentCompanyId,
+              empresaName: matchedStudent.empresaName,
+              consentLgpd: Boolean(matchedStudent.consentLgpd),
+              consentLgpdDate: matchedStudent.consentLgpdDate,
+              consentLgpdVersion: matchedStudent.consentLgpdVersion
             };
-
-            saveSystemUsers([...currentUsers, studentUser]);
-            setActiveSessionUser(studentUser);
-
-            logSecurityEvent({
-              eventType: 'LOGIN_SUCCESS',
-              userEmail: matchedStudent.email,
-              userName: matchedStudent.name,
-              provider: 'email_password',
-              details: `Aluno autenticado com sucesso: ${matchedStudent.name}.`,
-              status: 'success'
-            });
-
-            onLoginSuccess({
-              email: matchedStudent.email,
-              role: 'aluno',
-              provider: 'email',
-              name: matchedStudent.name,
-              user: studentUser
-            });
-            setIsLoading(false);
-            return;
           }
         }
 
-        // 4. Usuário NÃO cadastrado no sistema -> BLOQUEAR ACESSO!
-        const attemptResult = recordFailedLoginAttempt(cleanEmail);
+        // Verificar Empresa Cliente B2B cadastrada
+        let matchedEmpresa: any = null;
+        try {
+          const savedEmpresas = localStorage.getItem('vbsport_empresas_clientes');
+          if (savedEmpresas) {
+            const empresasList = JSON.parse(savedEmpresas);
+            matchedEmpresa = empresasList.find(
+              (emp: any) =>
+                (emp.email && emp.email.trim().toLowerCase() === cleanEmail) ||
+                (resolvedUser?.companyId && emp.id === resolvedUser.companyId) ||
+                (resolvedUser?.empresaId && emp.id === resolvedUser.empresaId)
+            );
+          }
+          if (!matchedEmpresa) {
+            const empSnap = await getDocs(
+              query(collection(db, 'empresas_clientes'), where('email', '==', cleanEmail))
+            );
+            if (!empSnap.empty) {
+              matchedEmpresa = empSnap.docs[0].data();
+            }
+          }
+        } catch (empErr) {
+          console.warn('Aviso ao verificar empresa cliente no login:', empErr);
+        }
+
+        if (!resolvedUser && matchedEmpresa) {
+          resolvedUser = {
+            id: authUid,
+            name: matchedEmpresa.ownerName || matchedEmpresa.name,
+            email: cleanEmail,
+            role: 'gerente',
+            phone: matchedEmpresa.phone || undefined,
+            avatar: matchedEmpresa.logoUrl || undefined,
+            department: matchedEmpresa.name,
+            active: matchedEmpresa.status === 'ativo',
+            createdAt: matchedEmpresa.activatedAt || new Date().toISOString().slice(0, 10),
+            permissions: matchedEmpresa.allowedModules || ['inicio', 'clientes', 'agenda', 'financeiro', 'treino', 'relatorios'],
+            companyId: matchedEmpresa.id,
+            empresaId: matchedEmpresa.id,
+            empresaName: matchedEmpresa.name
+          };
+        }
+
+        if (matchedEmpresa && matchedEmpresa.status === 'bloqueado') {
+          await signOut(auth).catch(() => {});
+          setErrorMessage(`Acesso Suspenso: A empresa "${matchedEmpresa.name}" está com o contrato bloqueado pelo administrador.`);
+          setIsLoading(false);
+          return;
+        }
+
+        if (!resolvedUser) {
+          await signOut(auth).catch(() => {});
+          logSecurityEvent({
+            eventType: 'LOGIN_FAILED',
+            userEmail: cleanEmail,
+            provider: 'email_password',
+            details: `Conta Firebase autenticada (${authUid}), porém sem perfil vinculado no sistema (${cleanEmail}).`,
+            status: 'danger'
+          });
+          setErrorMessage(`Usuário não cadastrado no sistema. O e-mail "${cleanEmail}" não possui perfil ativo vinculado. Clique em "Realizar Cadastro" abaixo.`);
+          setIsLoading(false);
+          return;
+        }
+
+        if (!resolvedUser.active) {
+          await signOut(auth).catch(() => {});
+          setErrorMessage(`O acesso para "${resolvedUser.name}" (${resolvedUser.email}) está desativado no sistema. Contate a administração.`);
+          setIsLoading(false);
+          return;
+        }
+
+        const nowLabel = 'Hoje, ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const resolvedCompanyId =
+          resolvedUser.companyId ||
+          resolvedUser.empresaId ||
+          matchedEmpresa?.id ||
+          MATRIX_UNIT_COMPANY_ID;
+
+        const { password: _removedPassword, ...safeBaseUser } = resolvedUser;
+        const sanitizedSessionUser: SystemUser = {
+          ...safeBaseUser,
+          lastLogin: nowLabel,
+          companyId: resolvedCompanyId,
+          empresaId: resolvedCompanyId
+        };
+
+        const existsInList = currentUsers.some(
+          u => u.id === sanitizedSessionUser.id || u.email.trim().toLowerCase() === cleanEmail
+        );
+        const updatedUsers = existsInList
+          ? currentUsers.map(u =>
+              u.id === sanitizedSessionUser.id || u.email.trim().toLowerCase() === cleanEmail
+                ? { ...u, ...sanitizedSessionUser }
+                : u
+            )
+          : [sanitizedSessionUser, ...currentUsers];
+
+        saveSystemUsers(updatedUsers);
+        setActiveSessionUser(sanitizedSessionUser);
+
+        // Atualizar lastLogin de forma segura no Firestore sem qualquer senha
+        if (sanitizedSessionUser.role === 'aluno') {
+          saveDocToFirestore('users', { ...sanitizedSessionUser, id: authUid }).catch(() => {});
+        }
+
         logSecurityEvent({
-          eventType: 'LOGIN_FAILED',
-          userEmail: cleanEmail,
+          eventType: 'LOGIN_SUCCESS',
+          userEmail: sanitizedSessionUser.email,
+          userName: sanitizedSessionUser.name,
           provider: 'email_password',
-          details: `Tentativa de login rejeitada: usuário não cadastrado (${cleanEmail}).`,
-          status: 'danger'
+          details: `Autenticação Firebase Auth bem-sucedida para ${sanitizedSessionUser.name} (UID: ${authUid}).`,
+          status: 'success'
         });
 
-        if (attemptResult.isLocked) {
-          setErrorMessage(`Limite de tentativas excedido! Acesso temporariamente bloqueado por ${attemptResult.remainingSeconds}s.`);
-        } else {
-          setErrorMessage(`Usuário não cadastrado. O e-mail "${cleanEmail}" não possui cadastro no sistema. Clique em "Realizar Cadastro" abaixo para criar sua conta.`);
-        }
+        onLoginSuccess({
+          email: sanitizedSessionUser.email,
+          role: sanitizedSessionUser.role,
+          provider: 'email',
+          name: sanitizedSessionUser.name,
+          user: sanitizedSessionUser
+        });
       } catch (err) {
         console.error('Erro na autenticação:', err);
+        setErrorMessage('Erro inesperado ao autenticar. Tente novamente.');
       } finally {
         setIsLoading(false);
       }
     })();
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
-    const cleanPass = password.trim();
+    const cleanPass = password;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!cleanEmail || !cleanName) {
       setErrorMessage('Preencha seu nome completo e e-mail para cadastrar.');
+      return;
+    }
+
+    if (!emailRegex.test(cleanEmail)) {
+      setErrorMessage('Informe um endereço de e-mail válido.');
+      return;
+    }
+
+    if (cleanEmail === 'marinho.gianluca@gmail.com') {
+      setErrorMessage('Este e-mail administrativo foi desativado no sistema.');
       return;
     }
 
@@ -327,7 +485,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBypass, 
       return;
     }
 
-    if (cleanPass !== confirmPassword.trim()) {
+    if (cleanPass !== confirmPassword) {
       setErrorMessage('A confirmação de senha não confere com a senha digitada.');
       return;
     }
@@ -340,31 +498,45 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBypass, 
     setIsLoading(true);
     setErrorMessage(null);
 
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
       const currentUsers = getSystemUsers();
-      
-      // Check if user already exists
       const existing = currentUsers.find(u => u.email.trim().toLowerCase() === cleanEmail);
       if (existing) {
         setErrorMessage(`O e-mail "${cleanEmail}" já está cadastrado para "${existing.name}". Clique em "Entrar na Conta".`);
+        setIsLoading(false);
         return;
       }
 
+      const authResult = await registerFirebaseAuthAccount(cleanEmail, cleanPass);
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const resolvedCompanyId =
+        urlParams?.get('companyId') ||
+        urlParams?.get('empresaId') ||
+        urlParams?.get('tenantId') ||
+        MATRIX_UNIT_COMPANY_ID;
+      const nowIso = new Date().toISOString();
+
+      // Auto-cadastro público sempre cria perfil restrito 'aluno' com consentLgpd obrigatório e sem senha em texto plano
       const newUser: SystemUser = {
-        id: `usr-${Date.now()}`,
+        id: authResult.uid,
         name: cleanName,
         email: cleanEmail,
-        role: role,
+        role: 'aluno',
         phone: phone.trim() || undefined,
         active: true,
-        createdAt: new Date().toISOString().slice(0, 10),
+        createdAt: nowIso.slice(0, 10),
         lastLogin: 'Agora (Novo Cadastro)',
-        department: role === 'admin' ? 'Diretoria' : (role === 'gerente' ? 'Gerência' : (role === 'treinador' ? 'Musculação/Aulas' : 'Atendimento')),
-        permissions: role === 'admin' 
-          ? ['inicio', 'dashboards', 'alunos', 'treinos', 'agenda', 'empresas_clientes', 'financeiro', 'vendas', 'comandas', 'estoque', 'crm', 'whatsapp', 'relatorios', 'configuracoes']
-          : ['inicio', 'alunos', 'agenda']
+        department: 'Aluno Matriculado',
+        permissions: ['inicio', 'treinos', 'agenda', 'avaliacoes', 'nutricao', 'bem_estar'],
+        companyId: resolvedCompanyId,
+        empresaId: resolvedCompanyId,
+        consentLgpd: true,
+        consentLgpdDate: nowIso,
+        consentLgpdVersion: '2026.1'
       };
+
+      await saveDocToFirestore('users', newUser);
+      await saveDocToFirestore('system_users', newUser);
 
       const updatedUsers = [newUser, ...currentUsers];
       saveSystemUsers(updatedUsers);
@@ -375,7 +547,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBypass, 
         userEmail: newUser.email,
         userName: newUser.name,
         provider: 'email_password',
-        details: `Novo cadastro criado com perfil ${newUser.role.toUpperCase()} e termos LGPD aceitos.`,
+        details: `Novo cadastro criado com Firebase Auth (UID: ${authResult.uid}) e termos LGPD aceitos.`,
         status: 'success'
       });
 
@@ -387,7 +559,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBypass, 
         name: newUser.name,
         user: newUser
       });
-    }, 500);
+    } catch (authErr: any) {
+      setErrorMessage(mapFirebaseAuthError(authErr, 'register'));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBiometricSuccess = (user: SystemUser) => {
@@ -404,6 +580,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBypass, 
 
   const handleGoogleSuccess = (data: { email: string; name: string; avatar?: string }) => {
     const cleanEmail = data.email.trim().toLowerCase();
+    if (cleanEmail === 'marinho.gianluca@gmail.com') {
+      setErrorMessage('O acesso administrador via marinho.gianluca@gmail.com foi desativado. Utilize glprofit.adm@gmail.com.');
+      return;
+    }
     const currentUsers = getSystemUsers();
     const matched = currentUsers.find(u => u.email.trim().toLowerCase() === cleanEmail);
 

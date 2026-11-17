@@ -29,6 +29,12 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
 }) => {
   const [reportType, setReportType] = useState<'financeiro' | 'inadimplencia' | 'frequencia' | 'vendas' | 'churn'>('financeiro');
   const [period, setPeriod] = useState<'atual' | 'trimestre' | 'ano'>('atual');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   const overdueStudents = students.filter(s => s.status === 'inadimplente');
   const totalOverdueAmount = overdueStudents.reduce((acc, s) => acc + s.pendingAmount, 0);
@@ -43,7 +49,15 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
   const netMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
 
   const handleExportCSV = () => {
-    alert("Relatório exportado em formato CSV/Excel com sucesso!");
+    const rows = transactions.map(t => `"${t.date}","${t.type}","${t.category}","${t.description}",${t.amount},"${t.status}"`).join('\n');
+    const blob = new Blob([`Data,Tipo,Categoria,Descricao,Valor,Status\n${rows}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `relatorio-financeiro-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Relatório exportado em formato CSV com sucesso!");
   };
 
   const handlePrintPDF = () => {
@@ -52,6 +66,12 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
 
   return (
     <div className="space-y-5">
+      {toastMsg && (
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-2xl border border-slate-700">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -209,8 +229,15 @@ export const RelatoriosTab: React.FC<RelatoriosTabProps> = ({
               </p>
             </div>
             <button
-              onClick={() => alert("Notificações de cobrança enviadas em massa por WhatsApp!")}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
+              type="button"
+              onClick={() => {
+                if (overdueStudents.length === 0) {
+                  showToast("Nenhum cliente inadimplente encontrado para notificar.");
+                  return;
+                }
+                showToast(`Notificações preparadas para ${overdueStudents.length} cliente(s) inadimplente(s).`);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
             >
               <MessageCircle className="h-3.5 w-3.5" />
               Cobrar Todos via WhatsApp

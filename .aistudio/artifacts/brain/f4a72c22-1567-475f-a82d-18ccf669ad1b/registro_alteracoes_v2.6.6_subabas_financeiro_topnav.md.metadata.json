@@ -1,0 +1,5 @@
+{
+  "summary":  "Registro técnico da versão v2.6.6 detalhando a migração da sub-aba \"Planos e Serviços\" e demais sub-abas financeiras para o TopNav, remoção do seletor interno do FinanceiroTab e sincronização global da navegação e CRUD de planos.",
+  "updatedAt":  "2026-11-16T14:14:20.695163424Z",
+  "userFacing":  true
+}

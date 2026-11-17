@@ -57,9 +57,15 @@ export const InicioTab: React.FC<InicioTabProps> = ({
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
   const [previewSchoolId, setPreviewSchoolId] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   const isAdmin = isMasterAdministrator(currentUser);
-  const greetingName = currentUser?.name ? currentUser.name.split(' ')[0] : 'Gianluca';
+  const greetingName = currentUser?.name ? currentUser.name.split(' ')[0] : 'Administrador';
 
   const canAccessCrm = hasTabPermission('crm', currentUser);
   const canAccessAlunos = hasTabPermission('alunos', currentUser);
@@ -83,7 +89,7 @@ export const InicioTab: React.FC<InicioTabProps> = ({
   const previewLicense = previewSchoolId ? licenses.find(l => l.id === previewSchoolId) : null;
   const userLicense = getLicenseForUser(currentUser);
   
-  // O banner de contrato NUNCA é exibido para o administrador Gianluca Marinho, 
+  // O banner de contrato NUNCA é exibido para o Administrador Master (GL PRO FIT ADM), 
   // exceto se ele acionar voluntariamente a simulação de pré-visualização de uma escola parceira
   const activeLicenseForBanner: PartnerSchoolLicense | null = previewLicense || (!isAdmin ? userLicense : null);
 
@@ -468,7 +474,13 @@ export const InicioTab: React.FC<InicioTabProps> = ({
 
           <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
             <button
-              onClick={() => alert("Link de indicação copiado! Compartilhe com outros gestores esportivos.")}
+              type="button"
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(window.location.origin).catch(() => {});
+                }
+                showToast("Link de indicação copiado! Compartilhe com outros gestores esportivos.");
+              }}
               className="px-3.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
             >
               Indicar Academia
@@ -506,7 +518,7 @@ export const InicioTab: React.FC<InicioTabProps> = ({
                 </span>
               </div>
               <div className="text-[11px] text-slate-500">
-                Chave PIX de Renovação: <strong className="text-slate-800">{activeLicenseForBanner.pixKey || 'marinho.gianluca@gmail.com'}</strong>
+                Chave PIX de Renovação: <strong className="text-slate-800">{activeLicenseForBanner.pixKey || 'glprofit.adm@gmail.com'}</strong>
               </div>
             </div>
 
@@ -518,9 +530,10 @@ export const InicioTab: React.FC<InicioTabProps> = ({
                 Lembrar depois
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setShowRenewModal(false);
-                  alert(`Solicitação de renovação enviada para o administrador Gianluca Marinho! Em breve você receberá a confirmação.`);
+                  showToast('Solicitação de renovação enviada para o administrador! Em breve você receberá a confirmação.');
                 }}
                 className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
               >
@@ -544,6 +557,11 @@ export const InicioTab: React.FC<InicioTabProps> = ({
         />
       )}
 
+      {toastMsg && (
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-xs font-bold shadow-2xl border border-slate-700">
+          {toastMsg}
+        </div>
+      )}
     </div>
   );
 };

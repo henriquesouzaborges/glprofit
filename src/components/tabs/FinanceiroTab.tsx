@@ -4,7 +4,6 @@ import {
   ArrowDownRight, 
   ArrowUpRight, 
   Plus, 
-  Filter, 
   Search, 
   CheckCircle2, 
   AlertCircle, 
@@ -13,9 +12,7 @@ import {
   QrCode, 
   Banknote, 
   Receipt, 
-  Send,
-  MessageSquare,
-  FileSpreadsheet
+  MessageSquare
 } from 'lucide-react';
 import { 
   FinancialTransaction, 
@@ -23,10 +20,12 @@ import {
   Student, 
   FinanceiroSubTab,
   PayRecurringCharge,
-  PaymentLink 
+  PaymentLink,
+  Plan 
 } from '../../types';
 import { formatCurrency, formatDate, sendWhatsAppMessage } from '../../utils';
 import { GlProfitPayTab } from './VbSportPayTab';
+import { PlanosServicosView } from './financeiro/PlanosServicosView';
 
 interface FinanceiroTabProps {
   transactions: FinancialTransaction[];
@@ -42,6 +41,10 @@ interface FinanceiroTabProps {
   onCancelRecurring?: (id: string) => void;
   onRetryRecurring?: (id: string) => void;
   onCreatePaymentLink?: (link: PaymentLink) => void;
+  plans?: Plan[];
+  onAddPlan?: (plan: Plan) => void;
+  onUpdatePlan?: (plan: Plan) => void;
+  onDeletePlan?: (id: string) => void;
 }
 
 export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
@@ -49,23 +52,19 @@ export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
   students,
   onAddTransaction,
   onSettlePayment,
-  activeSubTab: propActiveSubTab = 'receber',
-  onNavigateSubTab,
+  activeSubTab = 'receber',
   recurringCharges = [],
   paymentLinks = [],
   onAddPaymentLink,
   onAddRecurringCharge,
   onCancelRecurring,
   onRetryRecurring,
-  onCreatePaymentLink
+  onCreatePaymentLink,
+  plans,
+  onAddPlan,
+  onUpdatePlan,
+  onDeletePlan
 }) => {
-  const [internalSubTab, setInternalSubTab] = useState<FinanceiroSubTab>('receber');
-  const activeSubTab = propActiveSubTab || internalSubTab;
-
-  const setActiveSubTab = (tab: FinanceiroSubTab) => {
-    setInternalSubTab(tab);
-    onNavigateSubTab?.(tab);
-  };
   const [showNewTxModal, setShowNewTxModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMethod, setFilterMethod] = useState<string>('todos');
@@ -125,63 +124,15 @@ export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
     return true;
   });
 
-  const subTabButtons: { id: FinanceiroSubTab; label: string; icon: any; badge?: string }[] = [
-    { id: 'receber', label: 'Contas a Receber & Inadimplência', icon: ArrowDownRight },
-    { id: 'pagar', label: 'Contas a Pagar', icon: ArrowUpRight },
-    { id: 'dre', label: 'DRE Gerencial', icon: FileSpreadsheet },
-    { id: 'extrato', label: 'Extrato Completo', icon: Receipt },
-    { id: 'gl_profit_pay', label: 'GL Profit Pay (Recorrência)', icon: CreditCard, badge: 'Recorrente' },
-  ];
-
   return (
     <div className="space-y-6">
-      {/* Subtab Selector */}
-      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 border-b border-slate-200">
-        <div className="flex items-center gap-2">
-        {subTabButtons.map((sub) => {
-          const SubIcon = sub.icon;
-          const isActive = activeSubTab === sub.id;
-          return (
-            <button
-              key={sub.id}
-              onClick={() => setActiveSubTab(sub.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-blue-800 text-white shadow-xs'
-                  : 'bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
-              }`}
-            >
-              <SubIcon className={`h-3.5 w-3.5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-              <span>{sub.label}</span>
-              {sub.badge && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                  isActive ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                }`}>
-                  {sub.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        </div>
-
-        {activeSubTab !== 'gl_profit_pay' && (
-          <button
-            onClick={() => setShowNewTxModal(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs shrink-0 cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Nova Movimentação</span>
-          </button>
-        )}
-      </div>
-
       {activeSubTab === 'gl_profit_pay' ? (
         <div key="gl_profit_pay" className="animate-subtab-fade-in">
           <GlProfitPayTab
             recurringCharges={recurringCharges}
             paymentLinks={paymentLinks}
             students={students}
+            plans={plans}
             onCancelRecurring={onCancelRecurring}
             onRetryRecurring={onRetryRecurring}
             onCreatePaymentLink={onCreatePaymentLink}
@@ -189,8 +140,43 @@ export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
             onAddRecurringCharge={onAddRecurringCharge}
           />
         </div>
+      ) : activeSubTab === 'planos_servicos' ? (
+        <div key="planos_servicos" className="animate-subtab-fade-in">
+          <PlanosServicosView
+            plans={plans}
+            onAddPlan={onAddPlan}
+            onUpdatePlan={onUpdatePlan}
+            onDeletePlan={onDeletePlan}
+          />
+        </div>
       ) : (
         <>
+          {/* Contextual Header without internal sub-tabs */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+                <CircleDollarSign className="h-5 w-5 text-blue-600" />
+                <span>
+                  {activeSubTab === 'receber' && 'Contas a Receber & Inadimplência'}
+                  {activeSubTab === 'pagar' && 'Contas a Pagar'}
+                  {activeSubTab === 'dre' && 'DRE Gerencial'}
+                  {activeSubTab === 'extrato' && 'Extrato Financeiro Completo'}
+                </span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Controle de fluxo de caixa, liquidação de faturas, despesas operacionais e demonstrativo de resultados
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowNewTxModal(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs shrink-0 self-start sm:self-auto cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nova Movimentação</span>
+            </button>
+          </div>
+
           {/* Summary Financial Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Entradas / Receitas */}
@@ -260,68 +246,98 @@ export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
 
       {/* Sub-tab Content with Smooth Transition */}
       <div key={activeSubTab} className="animate-subtab-fade-in space-y-6">
-        {/* DRE View */}
-        {activeSubTab === 'dre' ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h2 className="text-base font-semibold text-slate-900">
-              Demonstrativo de Resultado do Exercício (DRE)
-            </h2>
-            <p className="text-xs text-slate-500">Mês de Referência: Setembro / 2024</p>
-          </div>
+        {/* DRE View (100% calculado a partir de transações reais no Firestore) */}
+        {activeSubTab === 'dre' ? (() => {
+          const paidTxs = transactions.filter(t => t.status === 'pago');
+          const paidRevenues = paidTxs.filter(t => t.type === 'receita');
+          const paidExpenses = paidTxs.filter(t => t.type === 'despesa');
 
-          <div className="space-y-3 font-mono text-sm">
-            <div className="flex justify-between py-2 border-b border-slate-100 font-sans font-semibold text-slate-900">
-              <span>(+) RECEITA BRUTA OPERACIONAL</span>
-              <span className="text-slate-900 font-mono">{formatCurrency(totalReceitas + 48200)}</span>
-            </div>
-            <div className="pl-4 flex justify-between text-slate-600 text-xs font-sans">
-              <span>• Mensalidades e Planos Recorrentes</span>
-              <span className="font-mono">{formatCurrency(46500)}</span>
-            </div>
-            <div className="pl-4 flex justify-between text-slate-600 text-xs font-sans">
-              <span>• Vendas PDV (Suplementos, Água, Bebidas)</span>
-              <span className="font-mono">{formatCurrency(totalReceitas + 1700)}</span>
-            </div>
+          const revenueByCategory: Record<string, number> = {};
+          paidRevenues.forEach((tx) => {
+            const cat = tx.category || 'Outras Receitas';
+            revenueByCategory[cat] = (revenueByCategory[cat] || 0) + Number(tx.amount || 0);
+          });
 
-            <div className="flex justify-between py-2 border-b border-slate-100 font-sans font-semibold text-rose-600">
-              <span>(-) CUSTOS DAS MERCADORIAS & TAXAS CARTÃO</span>
-              <span className="font-mono">({formatCurrency(3850)})</span>
-            </div>
+          const expensesByCategory: Record<string, number> = {};
+          paidExpenses.forEach((tx) => {
+            const cat = tx.category || 'Outras Despesas';
+            expensesByCategory[cat] = (expensesByCategory[cat] || 0) + Number(tx.amount || 0);
+          });
 
-            <div className="flex justify-between py-2 border-b border-slate-100 font-sans font-semibold text-slate-900 bg-slate-50 px-3 rounded-lg">
-              <span>(=) LUCRO BRUTO</span>
-              <span className="text-slate-900 font-mono">{formatCurrency(totalReceitas + 48200 - 3850)}</span>
-            </div>
+          const currentMonthLabel = new Date().toLocaleDateString('pt-BR', {
+            month: 'long',
+            year: 'numeric'
+          });
 
-            <div className="flex justify-between py-2 border-b border-slate-100 font-sans font-semibold text-rose-600">
-              <span>(-) DESPESAS OPERACIONAIS FIXAS</span>
-              <span className="font-mono">({formatCurrency(totalDespesas + 14500)})</span>
-            </div>
-            <div className="pl-4 flex justify-between text-slate-600 text-xs font-sans">
-              <span>• Aluguel do Imóvel & Condomínio</span>
-              <span className="font-mono">R$ 8.500,00</span>
-            </div>
-            <div className="pl-4 flex justify-between text-slate-600 text-xs font-sans">
-              <span>• Energia Elétrica, Água & Internet</span>
-              <span className="font-mono">R$ 2.450,00</span>
-            </div>
-            <div className="pl-4 flex justify-between text-slate-600 text-xs font-sans">
-              <span>• Manutenção Preventiva dos Aparelhos</span>
-              <span className="font-mono">R$ 1.200,00</span>
-            </div>
-            <div className="pl-4 flex justify-between text-slate-600 text-xs font-sans">
-              <span>• Softwares & Sistema GL PRO FIT ADM</span>
-              <span className="font-mono">R$ 389,00</span>
-            </div>
+          return (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+              <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">
+                    Demonstrativo de Resultado do Exercício (DRE)
+                  </h2>
+                  <p className="text-xs text-slate-500 capitalize">
+                    Período de Referência: {currentMonthLabel} • Baseado exclusivamente em lançamentos reais
+                  </p>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg self-start">
+                  {paidTxs.length} movimentações liquidadas
+                </span>
+              </div>
 
-            <div className="flex justify-between py-3 border-t-2 border-slate-900 font-sans font-bold text-base text-slate-900 bg-slate-50 px-3 rounded-lg border border-slate-200">
-              <span>(=) RESULTADO LÍQUIDO OPERACIONAL</span>
-              <span className="text-blue-600 font-mono">{formatCurrency((totalReceitas + 48200) - 3850 - (totalDespesas + 14500))}</span>
+              {paidTxs.length === 0 ? (
+                <div className="py-10 text-center space-y-2 border border-dashed border-slate-200 rounded-xl bg-slate-50/60">
+                  <CircleDollarSign className="w-8 h-8 mx-auto text-slate-300" />
+                  <p className="text-sm font-semibold text-slate-700">
+                    Nenhuma movimentação liquidada encontrada no banco de dados
+                  </p>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Lance receitas ou despesas em "Nova Movimentação" ou registre vendas no PDV para gerar o DRE automaticamente.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 font-mono text-sm">
+                  <div className="flex justify-between py-2 border-b border-slate-100 font-sans font-semibold text-slate-900">
+                    <span>(+) RECEITA BRUTA OPERACIONAL</span>
+                    <span className="text-emerald-700 font-mono">{formatCurrency(totalReceitas)}</span>
+                  </div>
+                  {Object.entries(revenueByCategory).length > 0 ? (
+                    Object.entries(revenueByCategory).map(([category, val]) => (
+                      <div key={category} className="pl-4 flex justify-between text-slate-600 text-xs font-sans">
+                        <span>• {category}</span>
+                        <span className="font-mono">{formatCurrency(val)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="pl-4 text-slate-400 text-xs font-sans">Nenhuma receita liquidada no período.</div>
+                  )}
+
+                  <div className="flex justify-between py-2 border-b border-slate-100 font-sans font-semibold text-rose-600">
+                    <span>(-) DESPESAS E CUSTOS OPERACIONAIS PAGOS</span>
+                    <span className="font-mono">({formatCurrency(totalDespesas)})</span>
+                  </div>
+                  {Object.entries(expensesByCategory).length > 0 ? (
+                    Object.entries(expensesByCategory).map(([category, val]) => (
+                      <div key={category} className="pl-4 flex justify-between text-slate-600 text-xs font-sans">
+                        <span>• {category}</span>
+                        <span className="font-mono">{formatCurrency(val)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="pl-4 text-slate-400 text-xs font-sans">Nenhuma despesa liquidada no período.</div>
+                  )}
+
+                  <div className="flex justify-between py-3 border-t-2 border-slate-900 font-sans font-bold text-base text-slate-900 bg-slate-50 px-3 rounded-lg border border-slate-200">
+                    <span>(=) RESULTADO LÍQUIDO OPERACIONAL</span>
+                    <span className={`font-mono ${saldoLiquido >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
+                      {formatCurrency(saldoLiquido)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
-      ) : (
+          );
+        })() : (
         <>
           {/* Search & Filters */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -427,9 +443,12 @@ export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
                               {tx.studentName && (
                                 <button
                                   onClick={() => {
+                                    const matchedStudent = students.find(s => s.id === tx.studentId || s.name === tx.studentName);
                                     sendWhatsAppMessage(
-                                      '(11) 97345-6789', 
-                                      `Olá ${tx.studentName}! Consta uma fatura em aberto de ${formatCurrency(tx.amount)} na VB SPORT. Chave PIX: financeiro@vbsport.com.br`
+                                      matchedStudent?.phone || '',
+                                      `Olá ${tx.studentName}! Consta uma fatura em aberto de ${formatCurrency(tx.amount)} na GL PRO FIT.`,
+                                      tx.studentName,
+                                      tx.studentId
                                     );
                                   }}
                                   className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-emerald-600 transition-colors"

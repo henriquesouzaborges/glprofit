@@ -1,0 +1,5 @@
+{
+  "summary": "Registro completo e detalhado da alteração v2.4.26 no GL PRO FIT:\n- Integração da logomarca oficial transparente (PNG) sem placa de fundo\n- Novo layout da tela de login com split screen: hero institucional com pílulas esportivas à esquerda e card branco elevado à direita\n- Inclusão das fontes Barlow e Barlow Condensed no index.html e tema Tailwind\n- Foto esportiva de fundo com degradê azul e escuro\n- Arquivos modificados e validações de compilação realizadas",
+  "updatedAt": "2026-11-05T13:17:48.277176789Z",
+  "userFacing": true
+}

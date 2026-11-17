@@ -1,0 +1,5 @@
+{
+  "summary": "Registro técnico completo da alteração v2.4.29 no GL PRO FIT:\n- Transformação do botão \"Ficha\" na aba Clientes para abrir uma Nova Tela Central completa (FichaCompletaAlunoView) em vez de card sobreposto (modal)\n- Hub 360° do aluno integrando:\n  * Treinos e Prescrições completas (divisões A, B, C, exercícios, repetições, cargas e descanso)\n  * Avaliações Físicas (composição corporal, Pollock 7 dobras, bioimpedância, IMC, peso e dobras)\n  * Questionários de Bem-Estar e Prontidão (score de prontidão, sono, estresse, PSE e EVA)\n  * Financeiro (histórico de pagamentos, mensalidades, quitações imediatas e formas de pagamento)\n  * Presenças e Catraca (histórico biométrico de passagens, horários e frequência)\n  * Nutrição e Dieta (cálculo de TMB/GET, macronutrientes, hidratação e refeições diárias)\n- Botão \"Voltar para Lista de Alunos\" para navegação ágil\n- Ações imediatas: envio de treino/análise por WhatsApp, teste direto na catraca, quitação de débito e impressão de ficha",
+  "updatedAt": "2026-11-05T13:37:31.470791411Z",
+  "userFacing": true
+}

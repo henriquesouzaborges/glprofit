@@ -1,0 +1,5 @@
+{
+  "summary": "Registro técnico da alteração v2.4.28 no GL PRO FIT:\n- Posicionamento de todos os cards sobrepostos (modais, popups e dialogs) na parte superior central da tela (items-start justify-center pt-6 sm:pt-10 md:pt-12 pb-8 overflow-y-auto)\n- Eliminação do alinhamento vertical no centro que exigia rolagem para encontrar o card\n- Regras globais em src/index.css e atualização direta nos componentes de modais\n- Validação de build e compilação sem erros",
+  "updatedAt": "2026-11-05T13:27:43.253309674Z",
+  "userFacing": true
+}

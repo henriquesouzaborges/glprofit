@@ -15,7 +15,15 @@
         "createdAt": { "type": "string", "maxLength": 64 },
         "lastLogin": { "type": "string", "maxLength": 64 },
         "mustChangePassword": { "type": "boolean" },
-        "permissions": { "type": "array" }
+        "permissions": { "type": "array" },
+        "empresaId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "empresaName": { "type": "string", "maxLength": 128 },
+        "invitedByUserId": { "type": "string", "maxLength": 128 },
+        "inviteToken": { "type": "string", "maxLength": 128 },
+        "consentLgpd": { "type": "boolean" },
+        "consentLgpdDate": { "type": "string", "maxLength": 64 },
+        "consentLgpdVersion": { "type": "string", "maxLength": 32 }
       },
       "required": ["id", "name", "email", "role", "active"]
     },
@@ -28,7 +36,7 @@
         "name": { "type": "string", "maxLength": 128 },
         "email": { "type": "string", "maxLength": 128 },
         "phone": { "type": "string", "maxLength": 32 },
-        "status": { "type": "string", "enum": ["ativo", "inativo", "pendente", "bloqueado"] },
+        "status": { "type": "string", "enum": ["ativo", "inadimplente", "trancado", "cancelado", "inativo", "pendente", "bloqueado"] },
         "plan": { "type": "string", "maxLength": 128 },
         "joinDate": { "type": "string", "maxLength": 64 },
         "birthDate": { "type": "string", "maxLength": 64 },
@@ -37,9 +45,17 @@
         "photo": { "type": "string", "maxLength": 512 },
         "consentLgpd": { "type": "boolean" },
         "consentLgpdDate": { "type": "string", "maxLength": 64 },
-        "consentLgpdVersion": { "type": "string", "maxLength": 32 }
+        "consentLgpdVersion": { "type": "string", "maxLength": 32 },
+        "empresaId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "empresaName": { "type": "string", "maxLength": 128 },
+        "registeredUserId": { "type": "string", "maxLength": 128 },
+        "invitedByUserId": { "type": "string", "maxLength": 128 },
+        "invitedByEmail": { "type": "string", "maxLength": 128 },
+        "inviteToken": { "type": "string", "maxLength": 128 },
+        "registrationSource": { "type": "string", "enum": ["manual", "link_convite", "auto_cadastro"] }
       },
-      "required": ["id", "name", "status"]
+      "required": ["id", "name", "status", "companyId", "consentLgpd"]
     },
     "EmpresaCliente": {
       "title": "EmpresaCliente",
@@ -54,7 +70,9 @@
         "limiteUsuarios": { "type": "number" },
         "vencimento": { "type": "string", "maxLength": 32 },
         "status": { "type": "string", "enum": ["ativo", "bloqueado"] },
-        "allowedModules": { "type": "array" }
+        "allowedModules": { "type": "array" },
+        "linkedStudents": { "type": "array" },
+        "linkedStudentIds": { "type": "array" }
       },
       "required": ["id", "razaoSocial", "cnpj", "status"]
     },
@@ -71,6 +89,19 @@
         "active": { "type": "boolean" }
       },
       "required": ["id", "name", "price", "active"]
+    },
+    "AdditionalService": {
+      "title": "AdditionalService",
+      "description": "Serviço adicional ou pacote avulso cadastrado no módulo Planos e Serviços",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "price": { "type": "number" },
+        "category": { "type": "string", "maxLength": 64 },
+        "description": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "name", "price"]
     },
     "FinancialTransaction": {
       "title": "FinancialTransaction",
@@ -475,20 +506,76 @@
         "status": { "type": "string", "enum": ["success", "warning", "danger"] }
       },
       "required": ["id", "timestamp", "eventType", "userEmail", "status"]
+    },
+    "StudentInvite": {
+      "title": "StudentInvite",
+      "description": "Link de convite de cadastro de aluno vinculado a uma empresa cliente",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "empresaId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "empresaName": { "type": "string", "maxLength": 128 },
+        "empresaEmail": { "type": "string", "maxLength": 128 },
+        "invitedByUserId": { "type": "string", "maxLength": 128 },
+        "invitedByName": { "type": "string", "maxLength": 128 },
+        "invitedByEmail": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "studentEmail": { "type": "string", "maxLength": 128 },
+        "studentPhone": { "type": "string", "maxLength": 32 },
+        "registrationUrl": { "type": "string", "maxLength": 1024 },
+        "status": { "type": "string", "enum": ["pendente", "concluido", "expirado"] },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "registeredUserId": { "type": "string", "maxLength": 128 },
+        "registeredStudentId": { "type": "string", "maxLength": 128 },
+        "registeredEmail": { "type": "string", "maxLength": 128 },
+        "completedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "empresaId", "empresaName", "status", "createdAt"]
+    },
+    "CompanyStudentLink": {
+      "title": "CompanyStudentLink",
+      "description": "Vínculo entre usuário/e-mail do aluno cadastrado e a empresa cliente remetente do link",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "empresaId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "empresaName": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "inviteId": { "type": "string", "maxLength": 128 },
+        "linkedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "empresaId", "userId", "studentId", "email", "linkedAt"]
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": "SystemUser",
+      "description": "Perfil autenticado no Firebase Auth com companyId multi-tenant e consentimento LGPD (sem senha)"
+    },
     "/system_users/{userId}": {
       "schema": "SystemUser",
-      "description": "Usuários e membros da equipe com credenciais de login, senhas e permissões"
+      "description": "Usuários e membros da equipe com papel, companyId e permissões (sem senha)"
+    },
+    "/empresas_clientes/{empresaId}": {
+      "schema": "EmpresaCliente",
+      "description": "Empresas clientes B2B SaaS cadastradas no sistema"
     },
     "/students/{studentId}": {
       "schema": "Student",
-      "description": "Cadastro e prontuário de alunos da academia"
+      "description": "Cadastro e prontuário de alunos vinculados por companyId e consentimento LGPD"
     },
     "/plans/{planId}": {
       "schema": "Plan",
       "description": "Planos e mensalidades"
+    },
+    "/additional_services/{serviceId}": {
+      "schema": "AdditionalService",
+      "description": "Serviços adicionais e pacotes avulsos"
     },
     "/financial_transactions/{transactionId}": {
       "schema": "FinancialTransaction",
@@ -597,6 +684,14 @@
     "/security_audit_logs/{logId}": {
       "schema": "SecurityAuditLog",
       "description": "Logs de auditoria e segurança"
+    },
+    "/student_invites/{inviteId}": {
+      "schema": "StudentInvite",
+      "description": "Links de convite para cadastro de alunos vinculados por empresa"
+    },
+    "/company_student_links/{linkId}": {
+      "schema": "CompanyStudentLink",
+      "description": "Vínculos automáticos de e-mail e userId de alunos às empresas clientes"
     }
   }
 }

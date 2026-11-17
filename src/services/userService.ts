@@ -2,62 +2,169 @@ import { SystemUser, SystemUserRole } from '../types';
 
 export const INITIAL_SYSTEM_USERS: SystemUser[] = [
   {
-    id: 'usr-1',
-    name: 'Gianluca Marinho',
-    email: 'marinho.gianluca@gmail.com',
+    id: 'admin-master-01',
+    name: 'GL PRO FIT ADM',
+    email: 'glprofit.adm@gmail.com',
     role: 'admin',
-    phone: '(11) 98765-4321',
-    avatar: '',
-    department: 'Diretoria Executiva',
+    phone: '(61)992095123',
+    department: 'Diretoria Executiva & Master',
     active: true,
-    createdAt: '2026-01-10',
-    lastLogin: 'Hoje',
-    permissions: [
-      'inicio', 'dashboards', 'alunos', 'professores', 'treinos', 'avaliacoes', 'nutricao', 'bem_estar', 'agenda', 
-      'financeiro', 'pay', 'vendas', 'comandas', 'estoque', 
-      'crm', 'whatsapp', 'relatorios', 'empresas_clientes', 'configuracoes'
-    ]
+    createdAt: '2026-11-01',
+    lastLogin: '2026-11-16',
+    mustChangePassword: false,
+    permissions: ['all']
   }
 ];
 
 const STORAGE_KEY = 'vbsport_system_users';
 const ACTIVE_USER_KEY = 'vbsport_active_user';
+const AUTH_USER_KEY = 'vbsport_auth_user';
+const USERS_CLEANUP_FLAG = 'glprofit_users_clean_v2610';
+const MASTER_SESSION_MIGRATION_FLAG = 'glprofit_master_session_v2611';
+
+const LEGACY_MOCK_USER_IDS = new Set(['usr-1', 'usr-2', 'usr-3', 'usr-4', 'usr-5', 'usr-6']);
+
+export const isLegacyMasterOrOldAdmin = (u: any): boolean => {
+  if (!u || !u.email) return true;
+  const cleanEmail = String(u.email).trim().toLowerCase();
+  if (cleanEmail === 'marinho.gianluca@gmail.com') return true;
+  if (u.id === 'usr-1') return true;
+  if (
+    u.role === 'admin' &&
+    cleanEmail !== 'glprofit.adm@gmail.com' &&
+    String(u.name || '').toLowerCase().includes('gianluca')
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const isLegacyFictitiousUser = (u: any): boolean => {
+  if (!u || !u.email) return true;
+  const cleanEmail = String(u.email).trim().toLowerCase();
+  if (cleanEmail === 'glprofit.adm@gmail.com' || u.id === 'admin-master-01') return false;
+  if (isLegacyMasterOrOldAdmin(u)) return true;
+  if (u.id && LEGACY_MOCK_USER_IDS.has(String(u.id))) return true;
+  if (cleanEmail.endsWith('@vbsport.com.br') || cleanEmail.endsWith('@glprofit.com')) return true;
+  if (
+    u.lastLogin === 'Agora' &&
+    (u.department === 'Instrutores & Treinadores' || u.department === 'Atendimento & Geral') &&
+    !u.phone
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const syncActiveSessionOnMigration = (): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    const rawActive = localStorage.getItem(ACTIVE_USER_KEY);
+    let shouldResetActive = !rawActive;
+    if (rawActive) {
+      const parsedActive = JSON.parse(rawActive);
+      if (isLegacyFictitiousUser(parsedActive) || isLegacyMasterOrOldAdmin(parsedActive)) {
+        shouldResetActive = true;
+      }
+    }
+    if (shouldResetActive) {
+      const master = INITIAL_SYSTEM_USERS[0];
+      localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(master));
+      localStorage.setItem(
+        AUTH_USER_KEY,
+        JSON.stringify({ name: master.name, email: master.email, role: master.role })
+      );
+    }
+    localStorage.setItem(MASTER_SESSION_MIGRATION_FLAG, 'true');
+  } catch {
+    const master = INITIAL_SYSTEM_USERS[0];
+    localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(master));
+    localStorage.setItem(
+      AUTH_USER_KEY,
+      JSON.stringify({ name: master.name, email: master.email, role: master.role })
+    );
+    localStorage.setItem(MASTER_SESSION_MIGRATION_FLAG, 'true');
+  }
+};
 
 export const getSystemUsers = (): SystemUser[] => {
   try {
+    if (
+      typeof window !== 'undefined' &&
+      (localStorage.getItem(USERS_CLEANUP_FLAG) !== 'true' ||
+        localStorage.getItem(MASTER_SESSION_MIGRATION_FLAG) !== 'true')
+    ) {
+      const savedRaw = localStorage.getItem(STORAGE_KEY);
+      let preservedValidUsers: SystemUser[] = [];
+      if (savedRaw) {
+        try {
+          const parsedExisting = JSON.parse(savedRaw);
+          if (Array.isArray(parsedExisting)) {
+            preservedValidUsers = parsedExisting.filter(
+              u => !isLegacyFictitiousUser(u) && !isLegacyMasterOrOldAdmin(u) && u?.email?.trim().toLowerCase() !== 'glprofit.adm@gmail.com'
+            );
+          }
+        } catch {
+          preservedValidUsers = [];
+        }
+      }
+      const nextUsers = [INITIAL_SYSTEM_USERS[0], ...preservedValidUsers];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUsers));
+      syncActiveSessionOnMigration();
+      localStorage.setItem(USERS_CLEANUP_FLAG, 'true');
+      return nextUsers;
+    }
+
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Filtrar e purgar usuários falsos/não cadastrados que foram criados automaticamente pelo bug anterior
-        const cleaned = parsed.filter(u => {
-          const isSpuriousDummy = 
-            u.lastLogin === 'Agora' && 
-            (u.department === 'Instrutores & Treinadores' || u.department === 'Atendimento & Geral') &&
-            u.email !== 'marinho.gianluca@gmail.com' &&
-            !u.phone;
-          return !isSpuriousDummy;
+        const cleaned = parsed
+          .filter(u => !isLegacyFictitiousUser(u) && !isLegacyMasterOrOldAdmin(u))
+          .map(u => {
+            const cleanEmail = u.email.trim().toLowerCase();
+            if (cleanEmail === 'glprofit.adm@gmail.com' || u.id === 'admin-master-01') {
+              return {
+                ...INITIAL_SYSTEM_USERS[0],
+                lastLogin: u.lastLogin || INITIAL_SYSTEM_USERS[0].lastLogin,
+                avatar: u.avatar
+              };
+            }
+            return u;
+          });
+
+        const map = new Map<string, SystemUser>();
+        cleaned.forEach(u => {
+          if (u && u.email) {
+            map.set(u.email.trim().toLowerCase(), u);
+          }
         });
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        if (!map.has('glprofit.adm@gmail.com')) {
+          map.set('glprofit.adm@gmail.com', INITIAL_SYSTEM_USERS[0]);
         }
-        return cleaned.length > 0 ? cleaned : INITIAL_SYSTEM_USERS;
+        const deduped = Array.from(map.values());
+        return deduped.length > 0 ? deduped : INITIAL_SYSTEM_USERS;
       }
     }
   } catch (e) {
     console.error('Erro ao ler usuários do sistema:', e);
   }
-  // Initialize with defaults if empty
   localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_SYSTEM_USERS));
   return INITIAL_SYSTEM_USERS;
 };
 
 export const saveSystemUsers = (users: SystemUser[]): void => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-    // Sincronizar assincronamente com o banco de dados Firebase Firestore
-    import('./firebaseDbService').then(({ syncCollectionToFirestore }) => {
-      syncCollectionToFirestore('system_users', users);
+    const sanitizedUsers = users
+      .filter(u => !isLegacyMasterOrOldAdmin(u))
+      .map(({ password: _ignoredPassword, ...rest }) => rest as SystemUser);
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedUsers));
+    // Sincronizar assincronamente com o banco de dados Firebase Firestore apenas quando autenticado no Firebase Auth
+    import('./firebaseDbService').then(({ syncCollectionToFirestore, auth }) => {
+      if (auth?.currentUser && sanitizedUsers.length > 0) {
+        syncCollectionToFirestore('system_users', sanitizedUsers);
+      }
     }).catch(err => {
       console.warn('Sync users to firestore skipped:', err);
     });
@@ -66,44 +173,82 @@ export const saveSystemUsers = (users: SystemUser[]): void => {
   }
 };
 
+export const deleteSystemUser = async (userId: string): Promise<void> => {
+  try {
+    const current = getSystemUsers();
+    const updated = current.filter(u => u.id !== userId);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('glprofit_system_users_updated', { detail: updated }));
+    }
+    const { deleteDocFromFirestore, auth } = await import('./firebaseDbService');
+    if (auth?.currentUser) {
+      await deleteDocFromFirestore('system_users', userId);
+    }
+  } catch (e) {
+    console.error('Erro ao excluir usuário do sistema:', e);
+  }
+};
+
 export const findUserByEmail = (email: string): SystemUser | null => {
   if (!email) return null;
   const cleanEmail = email.trim().toLowerCase();
+  if (cleanEmail === 'marinho.gianluca@gmail.com') return null;
   const users = getSystemUsers();
   return users.find(u => u.email.trim().toLowerCase() === cleanEmail) || null;
 };
 
 export const getActiveSessionUser = (): SystemUser => {
   try {
+    // Garantir que migrações de usuários e sessão já foram aplicadas antes de ler a sessão ativa
+    getSystemUsers();
+
     const saved = localStorage.getItem(ACTIVE_USER_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && parsed.email) {
-        // Refresh with latest data from getSystemUsers if exists
+        if (isLegacyMasterOrOldAdmin(parsed) || isLegacyFictitiousUser(parsed)) {
+          setActiveSessionUser(INITIAL_SYSTEM_USERS[0]);
+          return INITIAL_SYSTEM_USERS[0];
+        }
         const matched = findUserByEmail(parsed.email);
-        if (matched) return matched;
-        return parsed;
+        if (matched) {
+          return matched;
+        }
+        if (parsed.role === 'aluno') {
+          return parsed;
+        }
       }
     }
   } catch (e) {
     console.error('Erro ao carregar sessão ativa:', e);
   }
-  // Default to Gianluca (Admin)
+  setActiveSessionUser(INITIAL_SYSTEM_USERS[0]);
   return INITIAL_SYSTEM_USERS[0];
 };
 
 export const setActiveSessionUser = (user: SystemUser | null): void => {
   try {
+    if (user && isLegacyMasterOrOldAdmin(user)) {
+      user = INITIAL_SYSTEM_USERS[0];
+    }
     if (user) {
-      localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(user));
-      localStorage.setItem('vbsport_auth_user', JSON.stringify({
-        name: user.name,
-        email: user.email,
-        role: user.role
+      const { password: _ignoredPassword, ...cleanUser } = user as SystemUser;
+      localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(cleanUser));
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify({
+        name: cleanUser.name,
+        email: cleanUser.email,
+        role: cleanUser.role
       }));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('glprofit_active_user_updated', { detail: cleanUser }));
+      }
     } else {
       localStorage.removeItem(ACTIVE_USER_KEY);
-      localStorage.removeItem('vbsport_auth_user');
+      localStorage.removeItem(AUTH_USER_KEY);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('glprofit_active_user_updated', { detail: null }));
+      }
     }
   } catch (e) {
     console.error('Erro ao salvar sessão ativa:', e);
@@ -179,10 +324,9 @@ export const updateSystemUser = (userId: string, updates: Partial<SystemUser>): 
  */
 export const hasTabPermission = (tabId: string, user?: SystemUser | null): boolean => {
   if (!user) return true;
-  // Admin role has unrestricted access to all modules and configurations
-  if (user.role === 'admin') return true;
-
+  // Admin role or wildcard permission has unrestricted access to all modules and configurations
   const perms = user.permissions || [];
+  if (user.role === 'admin' || perms.includes('all')) return true;
   if (perms.length === 0) return false;
 
   const normalized = tabId.toLowerCase().trim();
@@ -268,23 +412,105 @@ export const getFirstAllowedTab = (user?: SystemUser | null): string => {
   return 'inicio';
 };
 
-// Iniciar assinatura em tempo real de usuários com o Firestore
+// Iniciar assinatura em tempo real de usuários com o Firestore apenas após autenticação Firebase (restrito a Admin/Gerente)
 if (typeof window !== 'undefined') {
-  import('./firebaseDbService').then(({ subscribeToFirestoreCollection }) => {
-    subscribeToFirestoreCollection('system_users', (remoteUsers: SystemUser[]) => {
-      try {
-        if (!remoteUsers || remoteUsers.length === 0) return;
-        const current = getSystemUsers();
-        // Merge without losing local registered entries if any
-        const mergedMap = new Map<string, SystemUser>();
-        current.forEach(u => mergedMap.set(u.email.toLowerCase(), u));
-        remoteUsers.forEach(u => mergedMap.set(u.email.toLowerCase(), u));
-        const mergedList = Array.from(mergedMap.values());
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedList));
-      } catch (err) {
-        console.warn('Erro ao sincronizar usuários remotos:', err);
+  Promise.all([
+    import('firebase/auth'),
+    import('firebase/firestore'),
+    import('./firebaseDbService')
+  ]).then(([{ onAuthStateChanged }, { doc, getDoc, where }, { db, subscribeToFirestoreCollection, deleteDocFromFirestore, auth }]) => {
+    let unsubUsers: (() => void) | null = null;
+    onAuthStateChanged(auth, async (fbUser) => {
+      if (unsubUsers) {
+        unsubUsers();
+        unsubUsers = null;
       }
-    }, INITIAL_SYSTEM_USERS);
+      if (!fbUser) return;
+
+      const cleanEmail = (fbUser.email || '').trim().toLowerCase();
+      let resolvedRole: SystemUserRole | undefined;
+      let resolvedCompanyId: string | undefined;
+
+      if (cleanEmail === 'glprofit.adm@gmail.com') {
+        resolvedRole = 'admin';
+        resolvedCompanyId = 'matriz-gl-pro-fit';
+      } else {
+        try {
+          const userSnap = await getDoc(doc(db, 'users', fbUser.uid));
+          if (userSnap.exists()) {
+            const d = userSnap.data() as any;
+            resolvedRole = d?.role;
+            resolvedCompanyId = d?.companyId || d?.empresaId;
+          } else {
+            const sysSnap = await getDoc(doc(db, 'system_users', fbUser.uid));
+            if (sysSnap.exists()) {
+              const d = sysSnap.data() as any;
+              resolvedRole = d?.role;
+              resolvedCompanyId = d?.companyId || d?.empresaId;
+            }
+          }
+        } catch {
+          // Fallback para sessão local ativa caso ainda esteja sincronizando
+        }
+        if (!resolvedRole) {
+          const localActive = getActiveSessionUser();
+          if (localActive?.email?.trim().toLowerCase() === cleanEmail) {
+            resolvedRole = localActive.role;
+            resolvedCompanyId = localActive.companyId || localActive.empresaId;
+          }
+        }
+      }
+
+      if (resolvedRole !== 'admin' && resolvedRole !== 'gerente') {
+        return;
+      }
+
+      const constraints =
+        resolvedRole === 'gerente' && resolvedCompanyId && resolvedCompanyId !== 'matriz-gl-pro-fit'
+          ? [where('companyId', '==', resolvedCompanyId)]
+          : undefined;
+
+      unsubUsers = subscribeToFirestoreCollection(
+        'system_users',
+        (remoteUsers: SystemUser[]) => {
+          try {
+            if (!remoteUsers || remoteUsers.length === 0) return;
+
+            // Expurgar automaticamente documentos fictícios legados que ainda estejam no Firestore
+            const legacyRemote = remoteUsers.filter(u => isLegacyFictitiousUser(u));
+            legacyRemote.forEach(legacy => {
+              if (legacy?.id) {
+                deleteDocFromFirestore('system_users', legacy.id).catch(() => {});
+              }
+            });
+
+            const validRemote = remoteUsers.filter(u => !isLegacyFictitiousUser(u));
+            const mergedMap = new Map<string, SystemUser>();
+            mergedMap.set('glprofit.adm@gmail.com', INITIAL_SYSTEM_USERS[0]);
+            validRemote.forEach(u => {
+              const uEmail = u.email.trim().toLowerCase();
+              if (uEmail === 'glprofit.adm@gmail.com') {
+                mergedMap.set(uEmail, {
+                  ...INITIAL_SYSTEM_USERS[0],
+                  lastLogin: u.lastLogin || INITIAL_SYSTEM_USERS[0].lastLogin,
+                  avatar: u.avatar
+                });
+              } else {
+                mergedMap.set(uEmail, u);
+              }
+            });
+            const mergedList = Array.from(mergedMap.values());
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedList));
+            window.dispatchEvent(new CustomEvent('glprofit_system_users_updated', { detail: mergedList }));
+          } catch (err) {
+            console.warn('Erro ao sincronizar usuários remotos:', err);
+          }
+        },
+        undefined,
+        undefined,
+        constraints
+      );
+    });
   }).catch(() => {});
 }
 

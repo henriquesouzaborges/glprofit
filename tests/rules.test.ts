@@ -29,6 +29,12 @@ describe('Validação de Regras de Segurança (firestore.rules)', () => {
     expect(rulesContent).toContain('userRole() in ["admin", "gerente", "treinador", "financeiro"]');
   });
 
+  it('Deve exigir companyId e isolamento multi-tenant para users e students', () => {
+    expect(rulesContent).toContain('match /users/{userId}');
+    expect(rulesContent).toContain('hasValidCompanyId(incoming())');
+    expect(rulesContent).toContain('matchesUserTenant(');
+  });
+
   it('Deve conter negação padrão por padrão (default deny)', () => {
     expect(rulesContent).toContain('match /{document=**}');
     expect(rulesContent).toContain('allow read, write: if false;');

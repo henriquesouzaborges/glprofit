@@ -190,26 +190,72 @@ export function saveFolhaRecords(records: ProfClassRecord[]): void {
   }
 }
 
-// Iniciar assinaturas em tempo real do Folha de Ponto com Firestore
+// Iniciar assinaturas em tempo real do Folha de Ponto com Firestore após autenticação Firebase (restrito a papéis autorizados)
 if (typeof window !== 'undefined') {
-  import('./firebaseDbService').then(({ subscribeToFirestoreCollection }) => {
-    subscribeToFirestoreCollection('folha_teachers', (remote: TeacherProfile[]) => {
-      if (remote && remote.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(remote));
-      }
-    }, INITIAL_TEACHERS);
+  Promise.all([
+    import('firebase/auth'),
+    import('firebase/firestore'),
+    import('./firebaseDbService')
+  ]).then(([{ onAuthStateChanged }, { doc, getDoc }, { db, subscribeToFirestoreCollection, auth }]) => {
+    let unsubs: Array<() => void> = [];
+    onAuthStateChanged(auth, async (fbUser) => {
+      unsubs.forEach(u => u());
+      unsubs = [];
+      if (!fbUser) return;
 
-    subscribeToFirestoreCollection('folha_turmas', (remote: ProfTurma[]) => {
-      if (remote && remote.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.TURMAS, JSON.stringify(remote));
+      const cleanEmail = (fbUser.email || '').trim().toLowerCase();
+      let role: string | undefined = cleanEmail === 'glprofit.adm@gmail.com' ? 'admin' : undefined;
+      if (!role) {
+        try {
+          const snap = await getDoc(doc(db, 'users', fbUser.uid));
+          if (snap.exists()) {
+            role = (snap.data() as any)?.role;
+          } else {
+            const sysSnap = await getDoc(doc(db, 'system_users', fbUser.uid));
+            if (sysSnap.exists()) {
+              role = (sysSnap.data() as any)?.role;
+            }
+          }
+        } catch {
+          // Ignorar falha pontual e verificar sessão local
+        }
       }
-    }, INITIAL_TURMAS);
+      if (!role) {
+        try {
+          const raw = localStorage.getItem('vbsport_active_user');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.email?.trim().toLowerCase() === cleanEmail) {
+              role = parsed.role;
+            }
+          }
+        } catch {
+          // Ignorar
+        }
+      }
 
-    subscribeToFirestoreCollection('folha_records', (remote: ProfClassRecord[]) => {
-      if (remote && remote.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(remote));
+      if (!role || !['admin', 'gerente', 'treinador', 'financeiro'].includes(role)) {
+        return;
       }
-    }, INITIAL_RECORDS);
+
+      unsubs.push(
+        subscribeToFirestoreCollection('folha_teachers', (remote: TeacherProfile[]) => {
+          if (remote && remote.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(remote));
+          }
+        }),
+        subscribeToFirestoreCollection('folha_turmas', (remote: ProfTurma[]) => {
+          if (remote && remote.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.TURMAS, JSON.stringify(remote));
+          }
+        }),
+        subscribeToFirestoreCollection('folha_records', (remote: ProfClassRecord[]) => {
+          if (remote && remote.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(remote));
+          }
+        })
+      );
+    });
   }).catch(() => {});
 }
 

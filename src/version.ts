@@ -14,13 +14,140 @@ export interface SystemVersionInfo {
   changelog: ChangelogItem[];
 }
 
+export const APP_VERSION = 'v2.6.14';
+export const BUILD_DATE = '2026-11-16';
+
 export const SYSTEM_VERSION_INFO: SystemVersionInfo = {
-  version: 'v2.6.2',
+  version: 'v2.6.14',
   versionName: 'GL PRO FIT Enterprise Suite',
-  releaseDate: '13 de Novembro de 2026',
-  buildNumber: '20261113.03',
+  releaseDate: '16 de Novembro de 2026',
+  buildNumber: '20261116.12',
   status: 'stable',
   changelog: [
+    {
+      version: 'v2.6.14',
+      date: '16/11/2026',
+      description: 'Integração completa do backend de Login e Cadastro com Firebase Authentication, criptografia nativa de senhas, captura obrigatória de companyId (B2B multi-tenant), aceite LGPD estrito e isolamento de dados em nuvem no Firestore, preservando integralmente o front-end.',
+      highlights: [
+        'Segurança & Criptografia Firebase Auth (firebase.ts, LoginPage.tsx, CadastroPage.tsx, firebaseDbService.ts): Conexão estrita a signInWithEmailAndPassword e createUserWithEmailAndPassword, remoção de qualquer fallback sem autenticação real ou senha em texto plano, sanitização recursiva anti-password no Firestore e bloqueio contra força bruta (auth/too-many-requests)',
+        'Vínculo Automático B2B Multi-Tenant (CadastroPage.tsx, studentInviteService.ts, App.tsx): Captura automática de companyId e token de convite via parâmetros da URL nos fluxos "Sou Aluno" e "Sou o Responsável do Aluno", com injeção obrigatória de companyId nos documentos das coleções users, system_users, students e company_student_links',
+        'LGPD & Isolamento em Nuvem (firestore.rules, userService.ts, folhaPontoService.ts, EnviarLinkCadastroModal.tsx): Validação obrigatória de consentLgpd == true no formulário e nas regras do Firestore, isolamento de leituras e listeners por companyId/UID e deploy das regras atualizadas'
+      ]
+    },
+    {
+      version: 'v2.6.13',
+      date: '16/11/2026',
+      description: 'Remoção definitiva de nomes legados fictícios ("VB SPORT ACADEMIA E CENTRO FITNESS LTDA" / "VB SPORT ADM") ao gerar links de cadastro de alunos, utilizando exclusivamente a empresa cadastrada no sistema.',
+      highlights: [
+        'Sanitização Automática de Configurações Legadas (studentInviteService.ts & App.tsx): Limpeza automática ao carregar de localStorage e ao sincronizar system_settings/general do Firestore, substituindo qualquer resquício de "VB SPORT" pela marca oficial GL PRO FIT',
+        'Resolução Fiel da Empresa Cadastrada (resolveRegisteredMainCompanyName & EnviarLinkCadastroModal.tsx): O formulário de envio de link utiliza o nome real cadastrado da empresa ativa (empresa B2B logada ou nome configurado em Configurações → Geral), eliminando nomes inventados',
+        'Limpeza Visual de Rótulos (ConfiguracoesTab.tsx, DashboardsTab.tsx, VendasTab.tsx, tabSettingsService.ts, partnerSchoolLicenseService.ts): Remoção dos rótulos residuais "VB SPORT ADM"'
+      ]
+    },
+    {
+      version: 'v2.6.12',
+      date: '16/11/2026',
+      description: 'Novo fluxo de envio de Link de Cadastro para Aluno na aba Clientes com vinculação automática de e-mail, UID do usuário e ficha do aluno à empresa remetente (Matriz ou Empresa Cliente B2B).',
+      highlights: [
+        'Botão Enviar Link de Cadastro (AlunosTab.tsx & EnviarLinkCadastroModal.tsx): Posicionado ao lado de "Cadastrar Novo Aluno", com trava automática para a empresa ativa do usuário logado, opção de envio via WhatsApp, cópia rápida e histórico de status do convite',
+        'Vinculação Automática Empresa <-> Aluno (studentInviteService.ts & CadastroPage.tsx): Cadastro completo via link (?view=cadastro&invite=...&empresaId=...) cria conta real no Firebase Auth (gerando UID), grava consentLgpd, registra o vínculo em company_student_links e atualiza linkedStudents / linkedStudentIds na empresa emissora',
+        'Visibilidade B2B & Isolamento Multi-Empresa (EmpresasClientesTab.tsx, LoginPage.tsx, NovoUsuarioModal.tsx, EditarUsuarioModal.tsx, App.tsx, firestore.rules): Empresas clientes operam isoladas com acesso aos seus próprios alunos vinculados e visualização de e-mails e IDs vinculados no painel B2B'
+      ]
+    },
+    {
+      version: 'v2.6.11',
+      date: '16/11/2026',
+      description: 'Exclusividade do Administrador Master via glprofit.adm@gmail.com (GL PRO FIT ADM), migração automática da sessão do cabeçalho superior direito e remoção definitiva do acesso administrativo via marinho.gianluca@gmail.com.',
+      highlights: [
+        'Sincronização de Sessão Ativa e Cabeçalho (userService.ts, App.tsx, Header.tsx): Migração imediata de sessões em cache antigas (marinho.gianluca@gmail.com / usr-1) para GL PRO FIT ADM (glprofit.adm@gmail.com) com atualização reativa no menu superior direito',
+        'Exclusividade Master no Firebase Auth & Firestore (firestore.rules, LoginPage.tsx, partnerSchoolLicenseService.ts): Bloqueio completo do e-mail marinho.gianluca@gmail.com e validação estrita via Firebase Auth para glprofit.adm@gmail.com',
+        'Recuperação Oficial & Sanitização (EsqueciSenhaModal.tsx, scripts/create-users.ts): Integração com sendPasswordResetEmail do Firebase Auth para glprofit.adm@gmail.com e bloqueio de persistência de campo password no Firestore'
+      ]
+    },
+    {
+      version: 'v2.6.10',
+      date: '16/11/2026',
+      description: 'Expurgo definitivo de usuários fictícios nas configurações de Usuários & Permissões (mantendo exclusivamente GL PRO FIT ADM) e correção do botão de exclusão com confirmação inline e remoção real no Firestore.',
+      highlights: [
+        'Limpeza de Usuários Fictícios (userService.ts): Reset de cache legado e filtragem automática de contas seed antigas na sincronização local e remota, mantendo apenas GL PRO FIT ADM (admin-master-01)',
+        'Exclusão Funcional de Usuários (ConfiguracoesTab.tsx): Substituição do confirm() nativo por botões inline Confirmar/Cancelar e exclusão persistente do documento na coleção system_users do Firestore via deleteSystemUser',
+        'Exibição de Acesso Total: Exibição clara de "Acesso Total (Todos os módulos)" para administradores com permissão all'
+      ]
+    },
+    {
+      version: 'v2.6.9',
+      date: '16/11/2026',
+      description: 'Saneamento de usuários master (admin-master-01 / GL PRO FIT ADM) em userService.ts, reforço das regras de permissão do Firestore e condicionamento das assinaturas em tempo real à sessão autenticada no Firebase Auth.',
+      highlights: [
+        'Saneamento de Usuários (userService.ts): Manutenção exclusiva do Administrador Master "GL PRO FIT ADM" (admin-master-01 / glprofit.adm@gmail.com) com suporte à permissão ["all"] e migração de cache legado',
+        'Correção de Permissões Firestore (firestore.rules): Aprimoramento de isMasterAdminEmail(), userRole() e isSystemAdmin() com verificação de UID em /users e /system_users e inclusão das coleções folha_teachers, folha_turmas e folha_records',
+        'Listeners Condicionados ao Firebase Auth: Assinaturas e sincronizações em tempo real de App.tsx, userService.ts, tabSettingsService.ts, folhaPontoService.ts, ExerciseCatalogView.tsx, PlanosServicosView.tsx e FichaCompletaAlunoView.tsx só executam quando autenticado, eliminando falsos alertas de Missing or insufficient permissions'
+      ]
+    },
+    {
+      version: 'v2.6.8',
+      date: '16/11/2026',
+      description: 'Correção do erro de renderização React ("Objects are not valid as a React child (found: [object Error])") ao tratar callbacks de erro de sincronização do Firestore no Catálogo de Exercícios.',
+      highlights: [
+        'Correção Crítica no Catálogo de Exercícios: Extração segura de err.message no callback onError de subscribeToFirestoreCollection, evitando que instâncias Error fossem gravadas em catalogSyncError e renderizadas no JSX',
+        'Blindagem de Callbacks de Erro Firestore: Padronização de conversão segura para string em firebaseDbService.ts e PlanosServicosView.tsx'
+      ]
+    },
+    {
+      version: 'v2.6.7',
+      date: '16/11/2026',
+      description: 'Blindagem definitiva contra dados fictícios (Zero-Mock Policy), sincronização integral em tempo real com o Firebase Firestore, Empty States explícitos e tratamento real de erros de banco de dados.',
+      highlights: [
+        'Versionamento & Governança v2.6.7: Exportação formal de APP_VERSION e BUILD_DATE em src/version.ts e sincronização no package.json',
+        'Zero-Mock Policy Integral: Expurgo de listas estáticas de fallback, taxas simuladas, avatares placeholder e gerador sintético de avaliações físicas',
+        'Persistência Total no Firestore: Collections plans, additional_services, exercises_catalog, empresas_clientes e system_settings/pay_pix_config com regras de segurança atualizadas',
+        'Empty States & Erros Reais: Exibição clara de estados vazios quando o banco retorna [] e banners de falha real de conexão/permissão no Firestore (sem injeção de dados falsos)',
+        'UX Segura sem Diálogos Nativos: Substituição de window.alert/window.confirm por confirmações inline e notificações toast no módulo B2B, Planos e Serviços, Catálogo de Exercícios e Ficha 360°'
+      ]
+    },
+    {
+      version: 'v2.6.6',
+      date: '16/11/2026',
+      description: 'Centralização integral das sub-abas do módulo Financeiro (incluindo "Planos e Serviços") no TopNav superior, remoção das sub-abas internas do componente FinanceiroTab e sincronização global da navegação e exclusão de planos.',
+      highlights: [
+        'TopNav Financeiro Atualizado: Adicionada a sub-aba "Planos e Serviços" na barra superior global do TopNav junto às demais sub-abas financeiras',
+        'Limpeza do FinanceiroTab: Removidas todas as sub-abas internas do corpo do componente FinanceiroTab para navegação 100% unificada pelo cabeçalho superior',
+        'Sincronização Global & Planos: Conexão completa do estado de planos (criar, editar e excluir com Firestore) e registro global da sub-aba em tabSettingsService',
+        'Exclusão Segura em Planos e Serviços: Substituição de diálogos nativos por confirmação em interface para exclusão confiável de planos e serviços'
+      ]
+    },
+    {
+      version: 'v2.6.5',
+      date: '16/11/2026',
+      description: 'Criação da sub-aba "Planos e Serviços" no módulo Financeiro, reset de dados fakes em GL Profit Pay com botão "Vincular Chave Pix", remoção definitiva da aba Maquininha Smart POS e inclusão de campo para URL real do link de pagamento gerado no banco.',
+      highlights: [
+        'Sub-aba Planos e Serviços no Financeiro: Módulo dedicado para criar e configurar planos de mensalidade e serviços adicionais',
+        'Reset do GL Profit Pay: Expurgo de dados simulados, limpeza de chaves e inclusão do botão "Vincular Chave Pix"',
+        'Remoção da Maquininha Smart POS: Aba e componentes de maquininha removidos totalmente do sistema',
+        'Links de Pagamento Reais: Inclusão de campo para colar o link real de pagamento gerado diretamente no banco ou gateway'
+      ]
+    },
+    {
+      version: 'v2.6.4',
+      date: '16/11/2026',
+      description: 'Correção da edição no catálogo de exercícios para abrir o exercício real selecionado (em vez de formulário aleatório) e adição de botão de exclusão de empresa cliente na aba B2B.',
+      highlights: [
+        'Correção de Edição no Catálogo de Exercícios: O botão "Editar" em cada exercício agora carrega o exercício real selecionado com seus dados preenchidos para configuração e salvamento',
+        'Botão de Exclusão de Empresa Cliente: Adicionado botão minimalista de exclusão (lixeira) nos cards de empresas clientes na aba B2B com confirmação de segurança',
+        'Padronização de Botões de Ação: Consistência de botões minimalistas de edição e exclusão em módulos críticos do sistema'
+      ]
+    },
+    {
+      version: 'v2.6.3',
+      date: '16/11/2026',
+      description: 'Atualização do e-mail do administrador master para glprofit.adm@gmail.com, padronização de formatadores (telefone, CPF, CNPJ), botão de envio de e-mail de acesso para empresas clientes B2B e menu dropdown de perfil no cabeçalho.',
+      highlights: [
+        'E-mail Master Atualizado: Transição do e-mail do operador master para `glprofit.adm@gmail.com` em todo o ecossistema (serviços, regras de segurança Firestore, seeds e documentação)',
+        'Formatadores Padrão: Implementação de utilitários robustos de formatação para telefone, CPF e CNPJ aplicados em formulários e cadastros',
+        'Envio de Acesso B2B: Adicionado o botão "Enviar Acesso por E-mail" na listagem de empresas clientes (B2B) para configurar o primeiro acesso da empresa',
+        'Menu Dropdown de Perfil no Cabeçalho: Inclusão de seta de expansão no perfil do usuário no cabeçalho com acesso direto às opções "Editar Cadastro" e "Sair (Logout)"'
+      ]
+    },
     {
       version: 'v2.6.2',
       date: '13/11/2026',

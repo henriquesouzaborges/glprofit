@@ -40,7 +40,7 @@ O sistema possui controle rígido de acesso baseado em níveis operacionais:
 
 | Usuário | E-mail | Senha | Cargo / Nível | Escopo de Acesso |
 | :--- | :--- | :--- | :--- | :--- |
-| **Gianluca Marinho** | `marinho.gianluca@gmail.com` | *Definida pelo administrador* | **Administrador Master (Diretoria)** | Acesso irrestrito a todas as abas, gestão de licenças parceiras, auditoria, configurações e backup. |
+| **Gianluca Marinho** | `glprofit.adm@gmail.com` | *Definida pelo administrador* | **Administrador Master (Diretoria)** | Acesso irrestrito a todas as abas, gestão de licenças parceiras, auditoria, configurações e backup. |
 | **Recepção Matriz** | `recepcao@vbsport.com.br` | *Definida pelo administrador* | **Recepção / Atendimento** | Alunos, Agenda, Vendas Balcão, Lanchonete, WhatsApp e Início. |
 | **Prof. Rodrigo Tavares** | `rodrigo.tavares@vbsport.com.br` | *Definida pelo administrador* | **Treinador / Instrutor** | Alunos, Treinos, Avaliações Físicas, Nutrição, Bem-Estar e Agenda. |
 | **Amanda Souza** | `financeiro@vbsport.com.br` | *Definida pelo administrador* | **Controladoria / Financeiro** | Financeiro, DRE, GL PRO FIT Pay, Vendas, Lanchonete, Estoque e Relatórios. |

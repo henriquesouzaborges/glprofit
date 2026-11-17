@@ -19,6 +19,34 @@ export function formatDate(dateString: string): string {
   }
 }
 
+export function formatPhone(value: string): string {
+  if (!value) return '';
+  const cleaned = value.replace(/\D/g, '');
+  if (cleaned.length <= 10) {
+    return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  }
+  return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+}
+
+export function formatCpf(value: string): string {
+  if (!value) return '';
+  const cleaned = value.replace(/\D/g, '').slice(0, 11);
+  return cleaned
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+}
+
+export function formatCnpj(value: string): string {
+  if (!value) return '';
+  const cleaned = value.replace(/\D/g, '').slice(0, 14);
+  return cleaned
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+}
+
 export interface OpenInternalWhatsAppDetail {
   phone: string;
   text?: string;

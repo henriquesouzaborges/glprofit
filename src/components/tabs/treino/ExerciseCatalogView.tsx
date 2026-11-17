@@ -4,18 +4,25 @@ import {
   Dumbbell, 
   Plus, 
   Info, 
-  Flame, 
-  Layers, 
   PlayCircle,
-  ExternalLink,
-  Sparkles,
-  BookOpen,
   ChevronLeft,
   ChevronRight,
-  Edit3
+  Edit3,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 import { ExerciseCatalogItem, MuscleGroup, ExerciseEquipment } from '../../../types';
 import { EXERCISE_CATALOG } from './exerciseDatabase';
+import { onAuthStateChanged } from 'firebase/auth';
+import {
+  auth,
+  subscribeToFirestoreCollection,
+  saveDocToFirestore,
+  deleteDocFromFirestore
+} from '../../../services/firebaseDbService';
+
+type PersistedExerciseItem = ExerciseCatalogItem & { isDeleted?: boolean };
 
 interface ExerciseCatalogViewProps {
   onSelectExercise?: (exercise: ExerciseCatalogItem) => void;
@@ -58,13 +65,93 @@ const EQUIPMENTS: { id: ExerciseEquipment | 'Todos'; label: string }[] = [
 
 export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
   onSelectExercise,
-  onAddCustomExercise,
-  targetSplitName
+  onAddCustomExercise
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | 'Todos'>('Todos');
   const [selectedEquipment, setSelectedEquipment] = useState<ExerciseEquipment | 'Todos'>('Todos');
-  const [previewExercise, setPreviewExercise] = useState<ExerciseCatalogItem | null>(() => EXERCISE_CATALOG[0] || null);
+  const [cloudOverrides, setCloudOverrides] = useState<PersistedExerciseItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('glprofit_exercises_catalog');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [catalogSyncError, setCatalogSyncError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  useEffect(() => {
+    let unsubCol: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, (fbUser) => {
+      if (unsubCol) {
+        unsubCol();
+        unsubCol = null;
+      }
+      if (!fbUser) return;
+      unsubCol = subscribeToFirestoreCollection<PersistedExerciseItem>(
+        'exercises_catalog',
+        (data) => {
+          setCloudOverrides(data);
+          setCatalogSyncError(null);
+          try {
+            localStorage.setItem('glprofit_exercises_catalog', JSON.stringify(data));
+          } catch {
+            // ignore storage quota
+          }
+        },
+        undefined,
+        (err) => setCatalogSyncError(err instanceof Error ? err.message : String(err))
+      );
+    });
+    return () => {
+      unsubAuth();
+      if (unsubCol) unsubCol();
+    };
+  }, []);
+
+  const mergedCatalog = useMemo<ExerciseCatalogItem[]>(() => {
+    const overrideMap = new Map<string, PersistedExerciseItem>();
+    cloudOverrides.forEach(item => overrideMap.set(item.id, item));
+
+    const baseIds = new Set(EXERCISE_CATALOG.map(item => item.id));
+    const customItems = cloudOverrides.filter(item => !baseIds.has(item.id) && !item.isDeleted);
+
+    const resolvedBase: ExerciseCatalogItem[] = [];
+    for (const base of EXERCISE_CATALOG) {
+      const ov = overrideMap.get(base.id);
+      if (ov) {
+        if (!ov.isDeleted) {
+          resolvedBase.push(ov);
+        }
+      } else {
+        resolvedBase.push(base);
+      }
+    }
+
+    return [...customItems, ...resolvedBase];
+  }, [cloudOverrides]);
+
+  const [previewExercise, setPreviewExercise] = useState<ExerciseCatalogItem | null>(() => mergedCatalog[0] || null);
+
+  useEffect(() => {
+    if (!previewExercise && mergedCatalog.length > 0) {
+      setPreviewExercise(mergedCatalog[0]);
+    } else if (previewExercise) {
+      const updated = mergedCatalog.find(ex => ex.id === previewExercise.id);
+      if (!updated) {
+        setPreviewExercise(mergedCatalog[0] || null);
+      } else if (updated !== previewExercise) {
+        setPreviewExercise(updated);
+      }
+    }
+  }, [mergedCatalog, previewExercise]);
 
   // New custom exercise state
   const [showNewCustomForm, setShowNewCustomForm] = useState(false);
@@ -74,6 +161,16 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
   const [customDifficulty, setCustomDifficulty] = useState<'Iniciante' | 'Intermediário' | 'Avançado'>('Intermediário');
   const [customInstructions, setCustomInstructions] = useState('');
   const [customVideoUrl, setCustomVideoUrl] = useState('');
+
+  // Edit exercise state
+  const [editingExercise, setEditingExercise] = useState<ExerciseCatalogItem | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editMuscle, setEditMuscle] = useState<MuscleGroup>('Peito');
+  const [editEquipment, setEditEquipment] = useState<ExerciseEquipment>('Halteres');
+  const [editDifficulty, setEditDifficulty] = useState<'Iniciante' | 'Intermediário' | 'Avançado'>('Intermediário');
+  const [editInstructions, setEditInstructions] = useState('');
+  const [editVideoUrl, setEditVideoUrl] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 40;
@@ -85,7 +182,7 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
 
   const filteredExercises = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return EXERCISE_CATALOG.filter(ex => {
+    return mergedCatalog.filter(ex => {
       const matchSearch = term === '' ||
         ex.name.toLowerCase().includes(term) ||
         ex.primaryMuscle.toLowerCase().includes(term) ||
@@ -102,7 +199,7 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
 
       return matchSearch && matchMuscle && matchEquip;
     });
-  }, [searchTerm, selectedMuscle, selectedEquipment]);
+  }, [mergedCatalog, searchTerm, selectedMuscle, selectedEquipment]);
 
   const totalPages = Math.max(1, Math.ceil(filteredExercises.length / ITEMS_PER_PAGE));
   const paginatedExercises = useMemo(() => {
@@ -110,7 +207,19 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
     return filteredExercises.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredExercises, currentPage]);
 
-  const handleSaveCustom = (e: React.FormEvent) => {
+  const persistOverrideLocally = (updater: (prev: PersistedExerciseItem[]) => PersistedExerciseItem[]) => {
+    setCloudOverrides(prev => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem('glprofit_exercises_catalog', JSON.stringify(next));
+      } catch {
+        // ignore storage quota
+      }
+      return next;
+    });
+  };
+
+  const handleSaveCustom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customName.trim()) return;
 
@@ -129,16 +238,91 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
     if (onAddCustomExercise) {
       onAddCustomExercise(newEx);
     }
-    EXERCISE_CATALOG.unshift(newEx);
+    persistOverrideLocally(prev => [newEx, ...prev.filter(item => item.id !== newEx.id)]);
     setShowNewCustomForm(false);
     setCustomName('');
     setCustomInstructions('');
     setCustomVideoUrl('');
     setPreviewExercise(newEx);
+
+    try {
+      await saveDocToFirestore('exercises_catalog', newEx);
+      setCatalogSyncError(null);
+      showToast(`Exercício "${newEx.name}" salvo no Firestore!`);
+    } catch (err: any) {
+      setCatalogSyncError(err?.message || 'Erro ao salvar exercício no Firestore.');
+    }
+  };
+
+  const handleSaveEditExercise = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingExercise || !editName.trim()) return;
+
+    const updatedEx: ExerciseCatalogItem = {
+      ...editingExercise,
+      name: editName.trim(),
+      muscleGroup: editMuscle,
+      equipment: editEquipment,
+      difficulty: editDifficulty,
+      primaryMuscle: editMuscle,
+      instructions: editInstructions ? editInstructions.split('\n').filter(Boolean) : editingExercise.instructions,
+      videoUrl: editVideoUrl.trim() || undefined
+    };
+
+    persistOverrideLocally(prev => [updatedEx, ...prev.filter(item => item.id !== updatedEx.id)]);
+    setShowEditModal(false);
+    setEditingExercise(null);
+    setPreviewExercise(updatedEx);
+
+    try {
+      await saveDocToFirestore('exercises_catalog', updatedEx);
+      setCatalogSyncError(null);
+      showToast(`Exercício "${updatedEx.name}" atualizado no banco de dados!`);
+    } catch (err: any) {
+      setCatalogSyncError(err?.message || 'Erro ao atualizar exercício no Firestore.');
+    }
+  };
+
+  const handleDeleteExercise = async (ex: ExerciseCatalogItem) => {
+    setConfirmDeleteId(null);
+    if (ex.isCustom) {
+      persistOverrideLocally(prev => prev.filter(item => item.id !== ex.id));
+      try {
+        await deleteDocFromFirestore('exercises_catalog', ex.id);
+        setCatalogSyncError(null);
+        showToast(`Exercício "${ex.name}" excluído do banco de dados.`);
+      } catch (err: any) {
+        setCatalogSyncError(err?.message || 'Erro ao excluir exercício no Firestore.');
+      }
+    } else {
+      const tombstone: PersistedExerciseItem = { ...ex, isDeleted: true };
+      persistOverrideLocally(prev => [tombstone, ...prev.filter(item => item.id !== ex.id)]);
+      try {
+        await saveDocToFirestore('exercises_catalog', tombstone);
+        setCatalogSyncError(null);
+        showToast(`Exercício "${ex.name}" removido do catálogo.`);
+      } catch (err: any) {
+        setCatalogSyncError(err?.message || 'Erro ao remover exercício no Firestore.');
+      }
+    }
   };
 
   return (
     <div className="space-y-4">
+      {toastMsg && (
+        <div className="fixed top-6 right-6 z-50 rounded-2xl bg-slate-900 text-white px-5 py-3 text-xs font-bold shadow-2xl border border-slate-700 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {catalogSyncError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span><strong>Falha de sincronização no Catálogo:</strong> {typeof catalogSyncError === 'string' ? catalogSyncError : String(catalogSyncError)}</span>
+        </div>
+      )}
+
       {/* Top Banner / Header */}
       <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
         <div className="flex items-center gap-3">
@@ -151,7 +335,7 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
                 Catálogo de Exercícios & Biomecânica
               </h2>
               <span className="text-[10px] font-bold bg-blue-500/30 text-blue-200 border border-blue-400/30 px-2.5 py-0.5 rounded-full">
-                +1.400 Exercícios
+                {mergedCatalog.length.toLocaleString('pt-BR')} Exercícios
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
@@ -292,19 +476,61 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPreviewExercise(ex);
-                            setShowNewCustomForm(true);
-                          }}
-                          className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
-                          title="Editar Exercício"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-blue-600" />
-                          <span className="hidden sm:inline text-[11px]">Editar</span>
-                        </button>
+                        {confirmDeleteId === ex.id ? (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExercise(ex)}
+                              className="text-[10px] font-bold text-rose-700 hover:underline cursor-pointer px-1"
+                            >
+                              Confirmar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="text-[10px] font-semibold text-slate-500 hover:text-slate-800 cursor-pointer px-1"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewExercise(ex);
+                                setEditingExercise(ex);
+                                setEditName(ex.name);
+                                setEditMuscle(ex.muscleGroup as any);
+                                setEditEquipment(ex.equipment as any);
+                                setEditDifficulty(ex.difficulty);
+                                setEditInstructions(ex.instructions.join('\n'));
+                                setEditVideoUrl(ex.videoUrl || '');
+                                setShowEditModal(true);
+                              }}
+                              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                              title="Editar Exercício"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                              <span className="hidden sm:inline text-[11px]">Editar</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(ex.id);
+                              }}
+                              className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold flex items-center shadow-2xs cursor-pointer"
+                              title="Excluir Exercício"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
 
                         {onSelectExercise && (
                           <button
@@ -435,7 +661,7 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
         </div>
       </div>
 
-      {/* Modal Custom Exercise */}
+      {/* Modal Custom Exercise (New) */}
       {showNewCustomForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-slate-200 space-y-4">
@@ -537,6 +763,113 @@ export const ExerciseCatalogView: React.FC<ExerciseCatalogViewProps> = ({
                   className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs"
                 >
                   Salvar no Catálogo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Exercise (Specific Exercise Configuration) */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-slate-900 text-sm">
+                Configurar / Editar Exercício: <span className="text-blue-600">{editingExercise?.name}</span>
+              </h3>
+              <button 
+                onClick={() => setShowEditModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditExercise} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Nome do Exercício *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-blue-600 focus:outline-hidden font-bold text-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Grupo Muscular
+                  </label>
+                  <select
+                    value={editMuscle}
+                    onChange={(e) => setEditMuscle(e.target.value as any)}
+                    className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-blue-600 focus:outline-hidden"
+                  >
+                    {MUSCLE_GROUPS.filter(m => m.id !== 'Todos').map(mg => (
+                      <option key={mg.id} value={mg.id}>{mg.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Equipamento
+                  </label>
+                  <select
+                    value={editEquipment}
+                    onChange={(e) => setEditEquipment(e.target.value as any)}
+                    className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-blue-600 focus:outline-hidden"
+                  >
+                    {EQUIPMENTS.filter(e => e.id !== 'Todos').map(eq => (
+                      <option key={eq.id} value={eq.id}>{eq.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Link do Vídeo / YouTube
+                </label>
+                <input
+                  type="url"
+                  value={editVideoUrl}
+                  onChange={(e) => setEditVideoUrl(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=..."
+                  className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-blue-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Instruções de Execução (uma por linha)
+                </label>
+                <textarea
+                  rows={4}
+                  value={editInstructions}
+                  onChange={(e) => setEditInstructions(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-blue-600 focus:outline-hidden leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs"
+                >
+                  Salvar Alterações do Exercício
                 </button>
               </div>
             </form>

@@ -405,14 +405,14 @@ export const VendasTab: React.FC<VendasTabProps> = ({
                 Venda Concluída com Sucesso!
               </h3>
               <p className="text-xs text-slate-500">
-                Comprovante fiscal / recibo gerado pelo sistema VB SPORT ADM
+                Comprovante fiscal / recibo gerado pelo sistema GL PRO FIT
               </p>
             </div>
 
             {/* Printable Receipt Preview */}
             <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-xs font-mono space-y-2 text-slate-800">
               <div className="text-center pb-2 border-b border-dashed border-slate-200 font-sans font-semibold">
-                VB SPORT ADM - FITNESS & GYM<br />
+                GL PRO FIT - FITNESS & GYM<br />
                 <span className="text-[10px] font-normal text-slate-500">
                   CNPJ: 42.890.123/0001-95 • São Paulo - SP
                 </span>

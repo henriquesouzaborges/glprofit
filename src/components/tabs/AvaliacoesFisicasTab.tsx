@@ -13,6 +13,7 @@ import {
   ArrowUpRight, 
   Sliders, 
   User, 
+  Users,
   Sparkles, 
   Clock, 
   CheckCircle2, 
@@ -48,7 +49,7 @@ import { TestesFuncionaisView } from './avaliacoes/TestesFuncionaisView';
 import { TestesForcaView } from './avaliacoes/TestesForcaView';
 import { TestesSaltoView } from './avaliacoes/TestesSaltoView';
 import { TestesCampoView } from './avaliacoes/TestesCampoView';
-import { AvaliacoesHubView, DEFAULT_STUDENT_FALLBACK } from './avaliacoes/AvaliacoesHubView';
+import { AvaliacoesHubView } from './avaliacoes/AvaliacoesHubView';
 import { AvaliacoesConfiguracoesHubView } from './avaliacoes/AvaliacoesConfiguracoesHubView';
 
 export const ACTIVE_AVALIACOES_SUBTABS: AvaliacoesSubTab[] = [
@@ -361,7 +362,7 @@ export const AvaliacoesFisicasTab: React.FC<AvaliacoesFisicasTabProps> = ({
   subTab: propSubTab,
   onSubTabChange
 }) => {
-  const [internalStudentId, setInternalStudentId] = useState(propStudentId || students[0]?.id || 'std-1');
+  const [internalStudentId, setInternalStudentId] = useState(propStudentId || students[0]?.id || '');
   const [localSubTab, setLocalSubTab] = useState<AvaliacoesSubTab>('avaliacoes');
   const [showSimulatorModal, setShowSimulatorModal] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -418,11 +419,24 @@ export const AvaliacoesFisicasTab: React.FC<AvaliacoesFisicasTabProps> = ({
         </div>
       )}
 
+      {/* ESTADO VAZIO REAL (ZERO-MOCK) QUANDO NÃO HÁ ALUNOS CADASTRADOS */}
+      {students.length === 0 && (currentSubTab === 'avaliacoes' || currentSubTab === 'configuracoes') && (
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center space-y-3">
+          <Users className="w-10 h-10 text-slate-300 mx-auto" />
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Nenhum aluno cadastrado para avaliação física</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              Cadastre o primeiro aluno na aba Clientes para realizar avaliações cineantropométricas, bioimpedância e perimetria com armazenamento no Firestore.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* RENDERIZAÇÃO DA SUB-ABA AVALIAÇÕES (HUB PRINCIPAL DE AVALIAÇÕES) */}
-      {currentSubTab === 'avaliacoes' && (
+      {currentSubTab === 'avaliacoes' && students.length > 0 && currentStudent && (
         <AvaliacoesHubView
           students={students}
-          student={currentStudent || students[0] || DEFAULT_STUDENT_FALLBACK}
+          student={currentStudent}
           onSelectStudentId={(id) => {
             setInternalStudentId(id);
             if (onSelectStudentId) onSelectStudentId(id);
@@ -432,8 +446,8 @@ export const AvaliacoesFisicasTab: React.FC<AvaliacoesFisicasTabProps> = ({
       )}
 
       {/* RENDERIZAÇÃO DA SUB-ABA CONFIGURAÇÕES (CENTRAL COM OS 10 MÓDULOS) */}
-      {currentSubTab === 'configuracoes' && (
-        <AvaliacoesConfiguracoesHubView student={currentStudent || students[0] || DEFAULT_STUDENT_FALLBACK} />
+      {currentSubTab === 'configuracoes' && students.length > 0 && currentStudent && (
+        <AvaliacoesConfiguracoesHubView student={currentStudent} />
       )}
 
       {/* SUPORTE CASO ACESSE DIRETAMENTE PELO IDENTIFICADOR DE UMA DAS 10 AVALIAÇÕES */}

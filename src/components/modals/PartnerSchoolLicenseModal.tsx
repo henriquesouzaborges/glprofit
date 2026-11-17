@@ -44,6 +44,7 @@ export const PartnerSchoolLicenseModal: React.FC<PartnerSchoolLicenseModalProps>
   const [licenses, setLicenses] = useState<PartnerSchoolLicense[]>(() => getPartnerSchoolLicenses());
   const [editingLicense, setEditingLicense] = useState<PartnerSchoolLicense | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Formulário para nova escola
@@ -59,7 +60,7 @@ export const PartnerSchoolLicenseModal: React.FC<PartnerSchoolLicenseModalProps>
     isWarningBannerActive: true,
     customWarningMessage: 'Evite a suspensão do acesso ao sistema e app do aluno.',
     status: 'ativa',
-    pixKey: 'marinho.gianluca@gmail.com',
+    pixKey: 'glprofit.adm@gmail.com',
     notes: ''
   });
 
@@ -107,7 +108,7 @@ export const PartnerSchoolLicenseModal: React.FC<PartnerSchoolLicenseModalProps>
   const handleAddNewSchool = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSchool.schoolName || !newSchool.email) {
-      alert('Preencha o nome da escola e o e-mail de contato.');
+      showToast('Preencha o nome da escola e o e-mail de contato.');
       return;
     }
     const created: PartnerSchoolLicense = {
@@ -123,7 +124,7 @@ export const PartnerSchoolLicenseModal: React.FC<PartnerSchoolLicenseModalProps>
       isWarningBannerActive: !!newSchool.isWarningBannerActive,
       customWarningMessage: newSchool.customWarningMessage || 'Evite perder os benefícios do sistema.',
       status: (newSchool.status as any) || 'ativa',
-      pixKey: newSchool.pixKey || 'marinho.gianluca@gmail.com',
+      pixKey: newSchool.pixKey || 'glprofit.adm@gmail.com',
       notes: newSchool.notes || '',
       createdAt: new Date().toISOString().split('T')[0]
     };
@@ -135,16 +136,15 @@ export const PartnerSchoolLicenseModal: React.FC<PartnerSchoolLicenseModalProps>
     showToast(`Escola "${created.schoolName}" cadastrada com sucesso!`);
   };
 
-  const handleDeleteLicense = (id: string, name: string) => {
-    if (confirm(`Tem certeza que deseja remover a escola parceira "${name}"?`)) {
-      const updated = licenses.filter(l => l.id !== id);
-      setLicenses(updated);
-      savePartnerSchoolLicenses(updated);
-      if (previewSchoolId === id) {
-        onTogglePreviewSchool(null);
-      }
-      showToast('Escola parceira removida.');
+  const handleDeleteLicense = (id: string) => {
+    const updated = licenses.filter(l => l.id !== id);
+    setLicenses(updated);
+    savePartnerSchoolLicenses(updated);
+    if (previewSchoolId === id) {
+      onTogglePreviewSchool(null);
     }
+    setConfirmDeleteId(null);
+    showToast('Escola parceira removida.');
   };
 
   return (
@@ -438,14 +438,33 @@ export const PartnerSchoolLicenseModal: React.FC<PartnerSchoolLicenseModalProps>
                           </button>
 
                           {/* Excluir */}
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteLicense(lic.id, lic.schoolName)}
-                            className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors cursor-pointer"
-                            title="Remover parceiro"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {confirmDeleteId === lic.id ? (
+                            <div className="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-xl px-2 py-1">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteLicense(lic.id)}
+                                className="text-[11px] font-bold text-rose-700 hover:underline cursor-pointer px-1"
+                              >
+                                Confirmar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 cursor-pointer px-1"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(lic.id)}
+                              className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors cursor-pointer"
+                              title="Remover parceiro"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

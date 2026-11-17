@@ -21,7 +21,7 @@ import {
   Sliders,
   ShieldCheck
 } from 'lucide-react';
-import { Student, WellnessCheckin, PainPoint, BemEstarSubTab, DEFAULT_STUDENT_FALLBACK } from '../../types';
+import { Student, WellnessCheckin, PainPoint, BemEstarSubTab } from '../../types';
 import { CheckinFormView } from './bem_estar/CheckinFormView';
 import { AnaliseView } from './bem_estar/AnaliseView';
 
@@ -110,7 +110,7 @@ export const BemEstarTab: React.FC<BemEstarTabProps> = ({
       ? rawSubTab
       : 'checkin';
 
-  const [internalStudentId, setInternalStudentId] = useState<string>(propStudentId || students[0]?.id || DEFAULT_STUDENT_FALLBACK.id);
+  const [internalStudentId, setInternalStudentId] = useState<string>(propStudentId || students[0]?.id || '');
   const activeStudentId = propStudentId || internalStudentId;
 
   const [checkins, setCheckins] = useState<WellnessCheckin[]>(INITIAL_WELLNESS_CHECKINS);
@@ -147,8 +147,8 @@ export const BemEstarTab: React.FC<BemEstarTabProps> = ({
   const [newGroupSelectedStudentIds, setNewGroupSelectedStudentIds] = useState<string[]>([]);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
-  const activeStudent = useMemo(() => {
-    return (students && students.find(s => s.id === activeStudentId)) || (students && students[0]) || DEFAULT_STUDENT_FALLBACK;
+  const activeStudent = useMemo<Student | null>(() => {
+    return (students && students.find(s => s.id === activeStudentId)) || (students && students[0]) || null;
   }, [students, activeStudentId]);
 
   const studentCheckins = useMemo(() => {
@@ -770,7 +770,11 @@ export const BemEstarTab: React.FC<BemEstarTabProps> = ({
             </div>
           </div>
 
-          {latestStudentCheckin?.menstrualData ? (
+          {!activeStudent ? (
+            <div className="p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300 text-xs text-slate-500">
+              Nenhum aluno cadastrado para exibir monitoramento menstrual. Cadastre alunos no sistema para iniciar o acompanhamento.
+            </div>
+          ) : latestStudentCheckin?.menstrualData ? (
             <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 space-y-1">
               <div className="text-xs font-bold text-rose-900 uppercase">
                 Status Atual de {activeStudent.name}:

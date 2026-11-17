@@ -1,5 +1,5 @@
 // Serviço de Gestão de Licenças e Contratos de Escolas Parceiras Terceirizadas
-// Permite ao Administrador (Gianluca Marinho) gerenciar datas de vencimento, 
+// Permite ao Administrador Master (GL PRO FIT ADM) gerenciar datas de vencimento, 
 // avisos de renovação e ativar/desativar o banner de contrato para escolas parceiras.
 
 import { SystemUser } from '../types';
@@ -28,15 +28,15 @@ const STORAGE_KEY = 'vbsport_partner_school_licenses';
 export const INITIAL_PARTNER_LICENSES: PartnerSchoolLicense[] = [];
 
 /**
- * Verifica se o usuário atual é o Administrador Master / Proprietário do Sistema (Gianluca Marinho)
+ * Verifica se o usuário atual é o Administrador Master / Proprietário do Sistema (glprofit.adm@gmail.com)
  */
 export const isMasterAdministrator = (user?: SystemUser | null): boolean => {
   if (!user) return true; // Default seguro para evitar exibição indevida
   const email = user.email?.trim().toLowerCase();
+  if (email === 'marinho.gianluca@gmail.com') return false;
   return (
-    email === 'marinho.gianluca@gmail.com' ||
-    user.id === 'usr-1' ||
-    (user.role === 'admin' && user.name.toLowerCase().includes('gianluca'))
+    email === 'glprofit.adm@gmail.com' ||
+    user.id === 'admin-master-01'
   );
 };
 
@@ -151,16 +151,16 @@ export const getLicenseForUser = (user?: SystemUser | null): PartnerSchoolLicens
 /**
  * Gera mensagem formatada para WhatsApp de cobrança / aviso de renovação para a escola
  */
-export const buildRenewalWhatsAppUrl = (license: PartnerSchoolLicense, adminName: string = 'Gianluca Marinho'): string => {
+export const buildRenewalWhatsAppUrl = (license: PartnerSchoolLicense, adminName: string = 'GL PRO FIT ADM'): string => {
   const countdown = calculateContractCountdown(license.expirationDate);
   const expFormatted = new Date(`${license.expirationDate}T12:00:00`).toLocaleDateString('pt-BR');
   
-  const text = `*COMUNICADO DE RENOVAÇÃO • GL PRO FIT / VB SPORT* 📋💼%0A%0A` +
+  const text = `*COMUNICADO DE RENOVAÇÃO • GL PRO FIT* 📋💼%0A%0A` +
     `Olá, *${license.contactName}*! Tudo bem?%0A%0A` +
     `Informamos que a licença de uso do sistema da *${license.schoolName}* está prevista para vencimento em *${expFormatted}* (${countdown.days} dia(s) restante(s)).%0A%0A` +
     `• *Plano:* ${license.planName}%0A` +
     `• *Valor da Renovação:* R$ ${license.planPrice.toFixed(2).replace('.', ',')}%0A` +
-    `• *Chave PIX:* ${license.pixKey || 'marinho.gianluca@gmail.com'}%0A%0A` +
+    `• *Chave PIX:* ${license.pixKey || 'glprofit.adm@gmail.com'}%0A%0A` +
     `Para garantir a continuidade dos acessos ao sistema, app do aluno e financeiro sem interrupções, por favor envie o comprovante por aqui.%0A%0A` +
     `Atenciosamente,%0A*${adminName}* • GL PRO FIT Enterprise`;
 

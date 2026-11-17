@@ -355,6 +355,24 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
     ]
   },
 
+  financeiro_planos_servicos: {
+    tab: 'financeiro',
+    subTab: 'planos_servicos',
+    title: 'Financeiro • Planos e Serviços',
+    description: 'Configuração de planos de mensalidade recorrentes e pacotes de serviços avulsos.',
+    groups: [
+      {
+        id: 'planos_rules',
+        title: 'Regras de Planos e Matrículas',
+        description: 'Parâmetros padrão para novos planos e serviços adicionais.',
+        fields: [
+          { id: 'permitir_adesao_online', label: 'Permitir Adesão via Link de Pagamento', description: 'Disponibilizar contratação automática pelos links do GL Profit Pay', type: 'toggle', value: true },
+          { id: 'exibir_servicos_adicionais', label: 'Exibir Pacotes de Serviços Adicionais', description: 'Mostrar serviços extras como Personal Trainer e Nutrição no catálogo', type: 'toggle', value: true }
+        ]
+      }
+    ]
+  },
+
   // 10. WHATSAPP
   whatsapp: {
     tab: 'whatsapp',
@@ -524,7 +542,7 @@ export const DEFAULT_TAB_CONFIGURATIONS: Record<string, TabConfiguration> = {
         title: 'Formatação & Cabeçalhos',
         description: 'Informações presentes nos documentos exportados em PDF e planilhas.',
         fields: [
-          { id: 'incluir_logo_timbrado', label: 'Incluir Logotipo nos Relatórios PDF', description: 'Imprimir cabeçalho oficial da VB SPORT nos comprovantes', type: 'toggle', value: true },
+          { id: 'incluir_logo_timbrado', label: 'Incluir Logotipo nos Relatórios PDF', description: 'Imprimir cabeçalho oficial da GL PRO FIT nos comprovantes', type: 'toggle', value: true },
           { id: 'incluir_dados_fiscais', label: 'Exibir CNPJ e Endereço Completo no Rodapé', description: 'Atende às exigências contábeis de comprovação de serviços prestados', type: 'toggle', value: true }
         ]
       }
@@ -661,35 +679,46 @@ export const resetTabConfiguration = (tab: TabType, subTab?: string): TabConfigu
   }
 };
 
-// Auto-inicializar sincronização em tempo real das configurações de abas com o Firestore
+// Auto-inicializar sincronização em tempo real das configurações de abas com o Firestore após autenticação Firebase
 if (typeof window !== 'undefined') {
-  import('./firebaseDbService').then(({ subscribeToFirestoreCollection }) => {
-    subscribeToFirestoreCollection('tab_settings', (remoteItems: any[]) => {
-      try {
-        if (!remoteItems || remoteItems.length === 0) return;
-        const saved = localStorage.getItem(STORAGE_KEY);
-        const storedMap: Record<string, TabConfiguration> = saved ? JSON.parse(saved) : {};
-        let updated = false;
-
-        for (const item of remoteItems) {
-          if (item && item.id && item.tab && item.groups) {
-            storedMap[item.id] = {
-              tab: item.tab,
-              subTab: item.subTab,
-              title: item.title,
-              description: item.description,
-              groups: item.groups
-            };
-            updated = true;
-          }
-        }
-
-        if (updated) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(storedMap));
-        }
-      } catch (err) {
-        console.warn('Erro ao mesclar configurações remotas de aba:', err);
+  Promise.all([
+    import('firebase/auth'),
+    import('./firebaseDbService')
+  ]).then(([{ onAuthStateChanged }, { subscribeToFirestoreCollection, auth }]) => {
+    let unsubTabs: (() => void) | null = null;
+    onAuthStateChanged(auth, (fbUser) => {
+      if (unsubTabs) {
+        unsubTabs();
+        unsubTabs = null;
       }
+      if (!fbUser) return;
+      unsubTabs = subscribeToFirestoreCollection('tab_settings', (remoteItems: any[]) => {
+        try {
+          if (!remoteItems || remoteItems.length === 0) return;
+          const saved = localStorage.getItem(STORAGE_KEY);
+          const storedMap: Record<string, TabConfiguration> = saved ? JSON.parse(saved) : {};
+          let updated = false;
+
+          for (const item of remoteItems) {
+            if (item && item.id && item.tab && item.groups) {
+              storedMap[item.id] = {
+                tab: item.tab,
+                subTab: item.subTab,
+                title: item.title,
+                description: item.description,
+                groups: item.groups
+              };
+              updated = true;
+            }
+          }
+
+          if (updated) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(storedMap));
+          }
+        } catch (err) {
+          console.warn('Erro ao mesclar configurações remotas de aba:', err);
+        }
+      });
     });
   }).catch(() => {});
 }
@@ -800,6 +829,7 @@ const SUBTAB_DISPLAY_NAMES: Record<string, string> = {
   // Financeiro
   receber: 'Contas a Receber',
   pagar: 'Contas a Pagar',
+  planos_servicos: 'Planos e Serviços',
   dre: 'DRE Gerencial',
   extrato: 'Extrato Financeiro',
   gl_profit_pay: 'GL Profit Pay (Recorrência)'

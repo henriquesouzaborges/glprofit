@@ -6,6 +6,8 @@ import {
   getDocs, 
   onSnapshot, 
   writeBatch,
+  query,
+  QueryConstraint,
   DocumentData,
   Unsubscribe
 } from 'firebase/firestore';
@@ -45,6 +47,23 @@ function updateStatus(patch: Partial<DatabaseStatus>) {
   statusListeners.forEach(listener => listener(currentDbStatus));
 }
 
+// Remove undefined fields and forbidden plaintext credentials recursively before writing to Firestore
+function sanitizeForFirestore<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(item => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+    const clean: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value as Record<string, any>)) {
+      if (v !== undefined && k !== 'password') {
+        clean[k] = sanitizeForFirestore(v);
+      }
+    }
+    return clean as T;
+  }
+  return value;
+}
+
 // Save or update a single document in Firestore
 export async function saveDocToFirestore<T extends { id: string }>(
   collectionName: string, 
@@ -56,7 +75,7 @@ export async function saveDocToFirestore<T extends { id: string }>(
   
   try {
     const docRef = doc(db, collectionName, String(data.id));
-    await setDoc(docRef, data, { merge: true });
+    await setDoc(docRef, sanitizeForFirestore(data), { merge: true });
     updateStatus({ 
       connected: true,
       syncing: false, 
@@ -65,7 +84,9 @@ export async function saveDocToFirestore<T extends { id: string }>(
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
-    updateStatus({ syncing: false, error: 'Erro ao sincronizar com banco em nuvem' });
+    const errMsg = error instanceof Error ? error.message : 'Erro ao sincronizar com banco em nuvem';
+    updateStatus({ syncing: false, error: errMsg });
+    throw error;
   }
 }
 
@@ -84,11 +105,14 @@ export async function deleteDocFromFirestore(
     updateStatus({ 
       connected: true,
       syncing: false, 
-      lastSync: new Date().toLocaleTimeString('pt-BR') 
+      lastSync: new Date().toLocaleTimeString('pt-BR'),
+      error: null
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
-    updateStatus({ syncing: false });
+    const errMsg = error instanceof Error ? error.message : 'Erro ao excluir registro no Firestore';
+    updateStatus({ syncing: false, error: errMsg });
+    throw error;
   }
 }
 
@@ -112,7 +136,7 @@ export async function syncCollectionToFirestore<T extends { id: string }>(
       for (const item of chunk) {
         if (item && item.id) {
           const docRef = doc(db, collectionName, String(item.id));
-          batch.set(docRef, item, { merge: true });
+          batch.set(docRef, sanitizeForFirestore(item), { merge: true });
         }
       }
       await batch.commit();
@@ -122,6 +146,7 @@ export async function syncCollectionToFirestore<T extends { id: string }>(
       connected: true,
       syncing: false, 
       lastSync: new Date().toLocaleTimeString('pt-BR'),
+      error: null,
       collectionsCount: {
         ...currentDbStatus.collectionsCount,
         [collectionName]: items.length
@@ -129,7 +154,8 @@ export async function syncCollectionToFirestore<T extends { id: string }>(
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, collectionName);
-    updateStatus({ syncing: false, error: 'Falha no lote de sincronização' });
+    const errMsg = error instanceof Error ? error.message : 'Falha no lote de sincronização';
+    updateStatus({ syncing: false, error: errMsg });
   }
 }
 
@@ -146,6 +172,7 @@ export async function fetchCollectionFromFirestore<T extends { id: string }>(
     });
     updateStatus({ 
       connected: true,
+      error: null,
       collectionsCount: {
         ...currentDbStatus.collectionsCount,
         [collectionName]: results.length
@@ -154,24 +181,28 @@ export async function fetchCollectionFromFirestore<T extends { id: string }>(
     return results;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, collectionName);
-    return [];
+    const errMsg = error instanceof Error ? error.message : 'Erro ao consultar coleção no Firestore';
+    updateStatus({ connected: false, error: errMsg });
+    throw error;
   }
 }
 
-// Subscribe to real-time changes on a collection
+// Subscribe to real-time changes on a collection (Zero-Mock: never inject fake fallback data on error)
 export function subscribeToFirestoreCollection<T extends { id: string }>(
   collectionName: string,
   onData: (data: T[]) => void,
-  initialSeedFallback?: T[]
+  initialSeedFallback?: T[],
+  onError?: (error: Error) => void,
+  constraints?: QueryConstraint[]
 ): Unsubscribe {
   const colRef = collection(db, collectionName);
+  const targetRef = constraints && constraints.length > 0 ? query(colRef, ...constraints) : colRef;
 
   return onSnapshot(
-    colRef,
+    targetRef,
     (snapshot) => {
       if (snapshot.empty && initialSeedFallback && initialSeedFallback.length > 0) {
-        // First boot: populate Firestore collection with initial seed
-        console.log(`Inicializando coleção "${collectionName}" no Firebase Firestore...`);
+        // Explicit initial seed only when non-empty seed is explicitly provided
         syncCollectionToFirestore(collectionName, initialSeedFallback);
         onData(initialSeedFallback);
         return;
@@ -184,6 +215,7 @@ export function subscribeToFirestoreCollection<T extends { id: string }>(
 
       updateStatus({
         connected: true,
+        error: null,
         lastSync: new Date().toLocaleTimeString('pt-BR'),
         collectionsCount: {
           ...currentDbStatus.collectionsCount,
@@ -191,17 +223,14 @@ export function subscribeToFirestoreCollection<T extends { id: string }>(
         }
       });
 
-      if (items.length > 0) {
-        onData(items);
-      }
+      // Always propagate real state including empty [] so UI shows genuine Empty States
+      onData(items);
     },
     (error) => {
       handleFirestoreError(error, OperationType.GET, collectionName);
-      updateStatus({ connected: false, error: error.message });
-      // If error occurs, fallback to local data
-      if (initialSeedFallback) {
-        onData(initialSeedFallback);
-      }
+      const errMsg = error instanceof Error ? error.message : String(error);
+      updateStatus({ connected: false, error: `Falha ao sincronizar "${collectionName}": ${errMsg}` });
+      onError?.(error instanceof Error ? error : new Error(errMsg));
     }
   );
 }
@@ -212,7 +241,7 @@ export async function initializeDatabase(): Promise<boolean> {
   updateStatus({
     connected: isHealthy,
     lastSync: isHealthy ? new Date().toLocaleTimeString('pt-BR') : null,
-    error: isHealthy ? null : 'Aguardando sincronização inicial com Firebase'
+    error: isHealthy ? null : 'Falha de conexão com o banco em nuvem Firebase Firestore'
   });
   return isHealthy;
 }
@@ -268,6 +297,9 @@ export async function syncAllSystemDataToCloud(customData?: Record<string, any[]
     const defaultMappings: Record<string, string> = {
       students: 'vbsport_students',
       plans: 'vbsport_plans',
+      additional_services: 'glprofit_additional_services',
+      exercises_catalog: 'glprofit_exercises_catalog',
+      empresas_clientes: 'vbsport_empresas_clientes',
       financial_transactions: 'vbsport_transactions',
       classes: 'vbsport_classes',
       workouts: 'vbsport_workouts',
@@ -288,7 +320,9 @@ export async function syncAllSystemDataToCloud(customData?: Record<string, any[]
       folha_turmas: 'vbsport_folha_turmas',
       folha_records: 'vbsport_folha_records',
       whatsapp_chats: 'vbsport_whatsapp_chats',
-      security_audit_logs: 'glprofit_security_audit_logs'
+      security_audit_logs: 'glprofit_security_audit_logs',
+      student_invites: 'glprofit_student_invites',
+      company_student_links: 'glprofit_company_student_links'
     };
 
     for (const [col, storageKey] of Object.entries(defaultMappings)) {

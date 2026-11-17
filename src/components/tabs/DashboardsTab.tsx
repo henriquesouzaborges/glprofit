@@ -94,7 +94,7 @@ export const DashboardsTab: React.FC<DashboardsTabProps> = ({
               Dashboards & Business Intelligence
             </h1>
             <span className="hidden sm:inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-900 border border-blue-200">
-              VB SPORT ADM
+              GL PRO FIT
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">

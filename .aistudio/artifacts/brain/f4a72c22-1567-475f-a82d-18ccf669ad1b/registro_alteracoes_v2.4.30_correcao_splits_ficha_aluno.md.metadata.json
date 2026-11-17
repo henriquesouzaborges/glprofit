@@ -1,0 +1,5 @@
+{
+  "summary": "Registro técnico da correção de erro v2.4.30 no GL PRO FIT:\n- Correção do TypeError: Cannot read properties of undefined (reading 'slice') na visualização da Ficha Completa do Aluno (FichaCompletaAlunoView.tsx)\n- Alinhamento da estrutura de dados de WorkoutPlan de \"divisions\" para \"splits\" (WorkoutSplit[]) com fallback defensivo e encadeamento opcional (?.)\n- Validação completa com compile_applet e lint_applet aprovados sem erros",
+  "updatedAt": "2026-11-05T13:41:34.454841449Z",
+  "userFacing": true
+}

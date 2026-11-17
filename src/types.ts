@@ -26,6 +26,14 @@ export interface Student {
   consentLgpdVersion?: string;
   gender?: 'masculino' | 'feminino';
   enrollmentNumber?: string;
+  empresaId?: string;
+  companyId?: string;
+  empresaName?: string;
+  registeredUserId?: string;
+  invitedByUserId?: string;
+  invitedByEmail?: string;
+  inviteToken?: string;
+  registrationSource?: 'manual' | 'link_convite' | 'auto_cadastro';
 }
 
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'boleto';
@@ -35,6 +43,7 @@ export type FinanceiroSubTab =
   | 'pagar' 
   | 'dre' 
   | 'extrato'
+  | 'planos_servicos'
   | 'gl_profit_pay';
 
 export interface FinancialTransaction {
@@ -521,6 +530,14 @@ export interface SystemUser {
   permissions: string[];
   mustChangePassword?: boolean;
   password?: string;
+  empresaId?: string;
+  companyId?: string;
+  empresaName?: string;
+  invitedByUserId?: string;
+  inviteToken?: string;
+  consentLgpd?: boolean;
+  consentLgpdDate?: string;
+  consentLgpdVersion?: string;
 }
 
 export interface ComandaItem {
@@ -768,6 +785,15 @@ export interface WhatsappChatbotFlow {
 
 export type EmpresasClientesSubTab = 'dashboard' | 'licencas';
 
+export interface LinkedStudentInfo {
+  userId: string;
+  studentId: string;
+  email: string;
+  name: string;
+  registeredAt: string;
+  inviteId?: string;
+}
+
 export interface EmpresaCliente {
   id: string;
   name: string;
@@ -784,6 +810,47 @@ export interface EmpresaCliente {
   maxUsers: number;
   notes?: string;
   logoUrl?: string;
+  linkedStudents?: LinkedStudentInfo[];
+  linkedStudentIds?: string[];
+}
+
+export interface StudentRegistrationInvite {
+  id: string;
+  empresaId: string;
+  companyId?: string;
+  empresaName: string;
+  empresaEmail?: string;
+  empresaLogoUrl?: string;
+  invitedByUserId: string;
+  invitedByName: string;
+  invitedByEmail: string;
+  studentName?: string;
+  studentEmail?: string;
+  studentPhone?: string;
+  suggestedPlanId?: string;
+  suggestedPlanName?: string;
+  registrationUrl: string;
+  status: 'pendente' | 'concluido' | 'expirado';
+  createdAt: string;
+  registeredUserId?: string;
+  registeredStudentId?: string;
+  registeredEmail?: string;
+  completedAt?: string;
+}
+
+export interface CompanyStudentLink {
+  id: string;
+  empresaId: string;
+  companyId?: string;
+  empresaName: string;
+  userId: string;
+  studentId: string;
+  email: string;
+  studentName: string;
+  inviteId?: string;
+  invitedByUserId?: string;
+  invitedByEmail?: string;
+  linkedAt: string;
 }
 
 export type TabType = 
